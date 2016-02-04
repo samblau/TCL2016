@@ -257,10 +257,10 @@ class Propagator_TD(Propagator):
 			plt.plot(self.TimesEvaluated,self.Populations[:,ii],linewidth=2)
 		#plt.ylim(0,1)
 		myleg = []
-		# for ii in range(Params.dim-1):
-		# 	myleg = np.concatenate((myleg,[str(ii+1)]))
-		# plt.legend(myleg)
-		plt.legend(['DBVc','DBVd','MBVa','MBVb','PCBc158','PCBd158','PCBc82','PCBd82']) # MAKE PRETTY PLOTS HERE
+		for ii in range(Params.dim-1):
+			myleg = np.concatenate((myleg,[str(ii+1)]))
+		plt.legend(myleg)
+		# plt.legend(['DBVc','DBVd','MBVa','MBVb','PCBc158','PCBd158','PCBc82','PCBd82']) # MAKE PRETTY PLOTS HERE
 
 		plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
 		plt.ylabel('Site Populations',fontsize = Params.LabelFontSize)

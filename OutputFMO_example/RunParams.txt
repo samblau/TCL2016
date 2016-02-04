@@ -4,4 +4,4 @@ Tmax = 62012.0
 TStep = 6.0
 Pop = [1, 1]
 Coh = [3, 1]
-It took 0.530837865671 minutes
+It took 0.594297381242 minutes

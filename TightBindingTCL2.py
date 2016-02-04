@@ -123,9 +123,6 @@ class TightBindingTCL:
 				self.peak_params[ii].append(O)
 				reorg_so_far += 2*l
 			if Params.const_reorg and Params.const_reorg_type == 1:
-				# print 'hi!'
-				print (AuPerWavenumber*Params.const_reorg_vals[ii]-reorg_so_far)/(2*AuPerWavenumber)
-				print huh
 				self.peak_params[ii].append(60*AuPerWavenumber)
 				self.peak_params[ii].append((AuPerWavenumber*Params.const_reorg_vals[ii]-reorg_so_far)/2)
 				self.peak_params[ii].append(1600*AuPerWavenumber)
@@ -267,7 +264,7 @@ class TightBindingTCL:
 				jgrid += DL(wgrid,g,l,O)
 				myreorg += 2*l
 				mythermalreorg += thermal_reorg(g,l,O,self.beta*AuPerWavenumber)
-				print 'sd_peak:' + str(ii)+ ':' + str(jj) + '=' + str(l) + ':' + str(5308.83662006/g) + ':' + str(O)
+				# print 'sd_peak:' + str(ii)+ ':' + str(jj) + '=' + str(l) + ':' + str(5308.83662006/g) + ':' + str(O)
 			temp=plt.plot(wgrid[0:Params.SD_range],jgrid[0:Params.SD_range])
 			plt.setp(temp,linewidth=2)
 			plt.title('RE = ' + str(myreorg) + ', TRE = ' + str(mythermalreorg) + ' - both (cm^-1)')
