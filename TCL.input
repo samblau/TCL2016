@@ -1,0 +1,52 @@
+name 645
+sites 8
+markov true
+secular true
+save_dens false
+duration 1.5
+step 0.00015
+sd_bot 0
+sd_range 1800
+const_reorg 0 748.15 672.34 1443.58 1103.51 974.00 1026.11 675.69 626.17
+coh_type 1
+pop 1
+coh 4 1
+temp 295
+dipole 0.0 49.8 121.0 79.5 92.3 59.8 27.6 52.2 30.0
+SD_dir 645SDs_sam_full_minimal/
+ham 1 1 17034.0
+ham 2 2 17116.0
+ham 3 3 16050.0
+ham 4 4 16373.0
+ham 5 5 15808.0
+ham 6 6 15889.0
+ham 7 7 15566.0
+ham 8 8 15647.0
+ham 2 1 319.4
+ham 3 1 -9.6
+ham 3 2 43.9
+ham 4 1 -43.9
+ham 4 2 7.7
+ham 4 3 4.3
+ham 5 1 20.3
+ham 5 2 30.5
+ham 5 3 -86.7
+ham 5 4 3.4
+ham 6 1 25.32
+ham 6 2 29.0
+ham 6 3 -2.9
+ham 6 4 86.2
+ham 6 5 7.8
+ham 7 1 -46.8
+ham 7 2 21.5
+ham 7 3 -15.8
+ham 7 4 53.8
+ham 7 5 11.0
+ham 7 6 29.0
+ham 8 1 -20.0
+ham 8 2 48.0
+ham 8 3 49.3
+ham 8 4 -14.7
+ham 8 5 10.0
+ham 8 6 -10.7
+ham 8 7 48.0

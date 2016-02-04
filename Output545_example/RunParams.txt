@@ -1,0 +1,7 @@
+Num peaks = 1 1 1 1 1 1 1 1 
+Markov Apprximation = True
+Tmax = 62012.0
+TStep = 6.0
+Pop = [6, 6]
+Coh = [6, 1]
+It took 0.774123815695 minutes

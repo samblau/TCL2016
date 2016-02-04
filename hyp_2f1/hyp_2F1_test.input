@@ -1,0 +1,14 @@
+(1.0e+0,0.0e+0)
+(0.9347305578e+0,0.6526944216e+0)
+(1.9347305578e+0,0.6526944216e+0)
+(0.9984690625e+0,0.0e+0)
+
+
+# Description of the input parameters
+#
+# Complex: a, b, c and z respectively 
+#
+# Compilation c++: g++ -O3 hyp_2F1_example.cpp -o run
+# Compilation f90: ifort -O3 hyp_2F1.f90 hyp_2F1_example.f90 -o run
+# Input instruction: ./run < hyp_2F1_test.input
+# The output is in hyp_2F1_test.output .
