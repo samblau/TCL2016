@@ -1,7 +1,7 @@
-Num peaks = 2 2 2 2 2 2 2 2 
+Num peaks = 28 26 27 29 28 31 30 26 
 Markov Apprximation = True
 Tmax = 62012.0
 TStep = 6.0
 Pop = [1, 1]
 Coh = [4, 1]
-It took 0.734041134516 minutes
+It took 0.845649349689 minutes
