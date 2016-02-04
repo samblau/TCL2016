@@ -19,25 +19,27 @@ name: Specifies the name of the system which will be used in the "Figures" and "
 
 sites: Specifies the number of physical sites contained in the system. Input should be an integer greater than 1. 
 
-markov: Specifies if the Markovian approximation will be used (True or true) or will not (False or false). In other words, True = Redfield, False = TCL2. Some of the following parameters take identical inputs and will be denoted as having a T/F input.
+markov: Specifies if the Markovian approximation will be used (True or true) or will not (False or false). In other words, True = Redfield, False = TCL2. Some of the following parameters take identical inputs and will be denoted as having a T/F input. The default is True.
 
-secular: Specifies if the secular approximation will be used with a T/F input. The secular approximation prevents transfer between populations and coherences. This can be crucial for preventing exciton populations from falling bellow zero depending on the specifics of your Hamiltonian and spectral density. 
+secular: Specifies if the secular approximation will be used with a T/F input. The secular approximation prevents transfer between populations and coherences. This can be crucial for preventing exciton populations from falling bellow zero depending on the specifics of your Hamiltonian and spectral density. The default is True.
 
-save_dens: Specifies if the trajectories of density matrices will be stored and printed with a T/F input.
+save_dens: Specifies if the trajectories of density matrices will be stored and printed with a T/F input. The default is False.
 
-duration: Specifies the length of propagation in picoseconds. Any positive integer or float is a valid input, though a recommended default value is 1 picosecond.
+duration: Specifies the length of propagation in picoseconds. Any positive integer or float is a valid input, though the default value is 1.5 picoseconds.
 
-step: Specifies the length of the time-step of propagation in picoseconds. A recommended default value is 0.00015 picoseconds.
+step: Specifies the length of the time-step of propagation in picoseconds. The default value is 0.00015 picoseconds.
 
-sd_range: Specifies the maximum frequency, in wavenumber, for the plotting of the spectral densities. Any positive integer or float is a valid input. 
+sd_top: Specifies the maximum frequency, in wavenumber, for the plotting of the spectral densities. Any positive integer or float is a valid input. The default value is 1800 wavenumbers.
 
-coh_type: Specifies whether we are simulating a coherence between physical sites (0) or between excitonic states (1). Excitonic states are the eigenvectors of the site-basis Hamiltonian. 0 and 1 are the only valid inputs.
+sd_bot: Specifies the minimum frequency, in wavenumber, for the plotting of the spectral densities. Any positive integer or float is a valid input. The default value is 1800 wavenumbers.
+
+coh_type: Specifies whether we are simulating a coherence between physical sites (0) or between excitonic states (1). Excitonic states are the eigenvectors of the site-basis Hamiltonian. 0 and 1 are the only valid inputs. The default value is 0.
 
 pop: Specifies the physical site on which the exciton is initially localized for population dynamics. Accepted inputs are integers between 1 and the number of physical sites. 
 
 coh: Takes two integer inputs that specify the indices of the two sites between which a coherence is propagated. These can be physical sites or excitonic states depending on the coh_type input. 
 
-temp: Specifies the temperature of the simulation in Kelvin.
+temp: Specifies the temperature of the simulation in Kelvin. The default value is 295. 
 
 dipole: Specifies a vector of average dipole amplitudes squared in units of debye^2. This should contain entries equal to the number of physical sites plus one, and the first entry should always be 0.0. Note that the dipole input used in all the example TCL.input files is essentially just the vector used for FMO. This explains why FMO is the only example with an absorbance spectrum that actually looks realistic. I hope to remedy this in the near future. 
 
@@ -45,12 +47,14 @@ SD_dir: Specifies the directory that contains the spectral density inputs which 
 
 ham: Specifies an element of the excitonic Hamiltonian. Entries should be of the following form: siteA(integer) siteB(integer) Hvalue(float). Setting the [A,B] element also automatically sets the [B,A] element. 
 
+const_reorg: This is an optional, complicated input that should be avoided in most cases. It is of the following form: type(integer 0, 1, or 2) reorg1(float) reorg2(float) ... reorgN(float) where N must equal the number of physical sites contained in the system. This allows for the reorganization energy of each site to be specified independent of the definition of the SD peaks. The difference between the reorganization energy already accounted for with SD peaks and the numbers specified (reorg1, reorg2, etc) will then be included in the calculation either through one large broad peak at 1600 wavenumbers in the case of type == 1 or with a constant shift of the site energies in the case of type == 2. Type == 0 will turn this feature off without having to remove the line from the input file. 
+
 
 
 
 	Examples provided and more information on spectral densities
 
-Sample TCL.input files have been provided for FMO (TCL.input), PE545 (TCL.input_545), and PC645 (TCL.input_645). Spectral densities accompanying these input files can be found in FMOSDs, 545SDs, and 645SDs_coker and 645SDs_sam respectively. Each of these directories contains csv files for each site contained in the system, and the files are numbered 1.csv, 2.csv, etc. Each csv file contains rows equal to the number of Drude-Lorentz peaks, and each row specifies the SD parameters as follows: gamma (cm^-1), lambda (cm^-1), Omega (cm^-1). The SDs contained in FMOSDs were fitted by Christoph Kreisbeck to the low-frequency region of the spectral densities reported by Shim et. al in the paper titled "Atomistic Study of the Long-Lived Quantum Coherences in the Fenna-Matthews-Olson Complex" published in 2012. The SDs contained in 545SDs are very basic and contain one peak each with gamma = lambda = 50 cm^-1. The SDs contained in 645SDs_coker are nearly identical to those used by Huo and Coker in the 2011 paper titled "Theoretical Study of Coherent Excitation Energy Transfer in Cryptophyte Phycocyanin 645 at Physiological Temperature". The SDs contained in 645SDs_sam are preliminary fits to the low-frequency region of some of my PC645 atomistic spectral densities recently obtained from QM/MM / TDDFT trajectories. 
+Sample TCL.input files have been provided for PC645 (TCL.input), PE545 (TCL.input_545), and FMO (TCL.input_FMO). Spectral densities accompanying these input files can be found in 645SDs, 545SDs, and FMOSDs respectively. Each of these directories contains csv files for each site contained in the system, and the files are numbered 1.csv, 2.csv, etc. Each csv file contains rows equal to the number of Drude-Lorentz peaks, and each row specifies the SD parameters as follows: gamma (cm^-1), lambda (cm^-1), Omega (cm^-1). The SDs contained in FMOSDs were fitted by Christoph Kreisbeck to the low-frequency region of the spectral densities reported by Shim et. al in the paper titled "Atomistic Study of the Long-Lived Quantum Coherences in the Fenna-Matthews-Olson Complex" published in 2012. The SDs contained in 545SDs are very basic and contain one peak each with gamma = lambda = 50 cm^-1. The SDs contained in 645SDs atomistic spectral densities recently obtained from QM/MM / TDDFT trajectories. 
 
 A brief aside on the form of the Drude-Lorentz spectral density: In this code we use the form J[w] = 2*l*g*w*(1/(g^2+(w-O)^2) + 1/(g^2+(w+O)^2)) where g = gamma, l = lambda, and O = Omega. Note that this is actually J[w]/hbar, which is the convention throughout the field. Note also that in some cases you may see a similar equation which also contains a factor of beta*(1/sqrt(6*pi)) out front. This has been explicitly rolled into our lambda, simplifying our functional form and allowing lambda to have units of [energy] instead of [energy^2].
 
@@ -63,7 +67,7 @@ When you run the code two directories are generated that contain figures and out
 
 I don't really want to get into a big discussion of the Spec____.png plots at this point. They are basically just the various parts of the absorbance spectrum obtained from propagating the dipole and then that absorbance spectrum with various Gaussians rolled over it. Almost all of the code that generates these plots was written by John Parkhill and I've left it in simply because it hasn't yet broken. At some point I hope to dramatically improve the spectroscopic aspect of the code but at present it is definitely a weakness.
 
-One last note for this section - while TCL2 is less approximate than Redfield since it incorporates non-Markovian effects, don't expect to see massively different results between the two theories. Non-Markovian effects are limited to short times, after which the Gammas calculated by Redfield and TCL2 will be identical. With TCL2 you may see additional oscillations and can see some differences in rapid transfer rates, but if you obvserve more substantial changes please refer them to Sam for additional investigation. 
+One last note for this section - while TCL2 is more accurate than Redfield since it incorporates non-Markovian effects, don't expect to see massively different results between the two theories. Non-Markovian effects are limited to short times, after which the Gammas calculated by Redfield and TCL2 will be identical. With TCL2 you may see additional oscillations and can see some differences in rapid transfer rates, but if you obvserve more substantial changes please refer them to Sam for additional investigation. 
 
 
 

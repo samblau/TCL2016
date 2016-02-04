@@ -42,6 +42,15 @@ class CalculationParameters:
 		self.dim = 0
 		self.const_reorg = False
 		siteE = []
+		self.SD_range = 1800
+		self.SD_bot = 0
+		self.Duration = 1.5
+		self.step_input = 0.00015
+		self.coh_type = 0
+		self.MarkovApprox = True
+		self.save_dens = False
+		self.SecularApproximation = True
+		self.Temperature = 295.0
 		myinput = open('TCL.input')
 		for line in myinput:
 			split_line = line.split()
@@ -52,10 +61,16 @@ class CalculationParameters:
 				self.SystemName = split_line[1]
 			if split_line[0] == 'duration':
 				self.Duration = float(split_line[1])
-			if split_line[0] == 'sd_range':
+			if split_line[0] == 'sd_top':
 				self.SD_range = int(split_line[1])
+				if self.SD_range < 0:
+					print "ERROR: sd_top must be greater than zero! Exiting..."
+					print huh
 			if split_line[0] == 'sd_bot':
 				self.SD_bot = int(split_line[1])
+				if self.SD_bot < 0:
+					print "ERROR: sd_bot must be greater than zero! Exiting..."
+					print huh
 			if split_line[0] == 'step':
 				self.step_input = float(split_line[1])
 			if split_line[0] == 'coh_type':
@@ -70,7 +85,7 @@ class CalculationParameters:
 				elif split_line[1] == 'True':
 					self.MarkovApprox = True
 				else:
-					print 'ERROR: markov must be set to True, true, False, or false!'
+					print 'ERROR: markov must be set to True, true, False, or false! Exiting...'
 					print huh
 			if split_line[0] == 'save_dens':
 				if split_line[1] == 'false':
@@ -82,7 +97,7 @@ class CalculationParameters:
 				elif split_line[1] == 'True':
 					self.save_dens = True
 				else:
-					print 'ERROR: save_dens must be set to True, true, False, or false!'
+					print 'ERROR: save_dens must be set to True, true, False, or false! Exiting...'
 					print huh
 			if split_line[0] == 'secular':
 				if split_line[1] == 'false':
@@ -94,10 +109,8 @@ class CalculationParameters:
 				elif split_line[1] == 'True':
 					self.SecularApproximation = 1
 				else:
-					print 'ERROR: secular must be set to True, true, False, or false!'
+					print 'ERROR: secular must be set to True, true, False, or false! Exiting...'
 					print huh
-			# if split_line[0] == 'scale':
-			# 	self.globalscale = float(split_line[1])
 			if split_line[0] == 'pop':
 				self.populations = [int(split_line[1]),int(split_line[1])]
 			if split_line[0] == 'coh':
@@ -113,13 +126,16 @@ class CalculationParameters:
 				for ii in range(self.dim-1):
 					self.const_reorg_vals[ii] = float(split_line[ii+2])
 		
-		if self.dim == 0:
-			print 'ERROR: Number of system sites not set correctly! Check the energies entry in the input!'
+		if self.SD_bot >= self.SD_range:
+			print "ERROR: sd_top must be greater than sd_bot. Exiting..."
 			print huh
 
-		self.globalscale = 0#min(siteE)-400
+		if self.dim == 0:
+			print 'ERROR: Number of system sites not set correctly! Check the energies entry in the input! Exiting...'
+			print huh
+
+		self.globalscale = min(siteE)-400
 		self.upperlimit = max(siteE)+500
-		# self.SystemName = 'fmo' # Defined Globally in Main.py 
 		self.nocc = 4
 		self.nvirt = 4
 		self.nmo = 8    # These will be determined on-the-fly reading from disk anyways. 
