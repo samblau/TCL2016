@@ -3,6 +3,7 @@ sites 8
 markov true
 secular true
 save_dens false
+save_gammas true
 duration 1.5
 step 0.00015
 sd_bot 0

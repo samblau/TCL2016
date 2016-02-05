@@ -25,6 +25,8 @@ secular: Specifies if the secular approximation will be used with a T/F input. T
 
 save_dens: Specifies if the trajectories of density matrices will be stored and printed with a T/F input. The default is False.
 
+save_gammas: Specifies if the four markovian gamma tensors will be saved with a T/F input. The default is False. 
+
 duration: Specifies the length of propagation in picoseconds. Any positive integer or float is a valid input, though the default value is 1.5 picoseconds.
 
 step: Specifies the length of the time-step of propagation in picoseconds. The default value is 0.00015 picoseconds.

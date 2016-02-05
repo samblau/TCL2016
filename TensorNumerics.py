@@ -49,6 +49,7 @@ class CalculationParameters:
 		self.coh_type = 0
 		self.MarkovApprox = True
 		self.save_dens = False
+		self.save_gammas = False
 		self.SecularApproximation = True
 		self.Temperature = 295.0
 		myinput = open('TCL.input')
@@ -98,6 +99,18 @@ class CalculationParameters:
 					self.save_dens = True
 				else:
 					print 'ERROR: save_dens must be set to True, true, False, or false! Exiting...'
+					print huh
+			if split_line[0] == 'save_gammas':
+				if split_line[1] == 'false':
+					self.save_gammas = False
+				elif split_line[1] == 'False':
+					self.save_gammas = False
+				elif split_line[1] == 'true':
+					self.save_gammas = True
+				elif split_line[1] == 'True':
+					self.save_gammas = True
+				else:
+					print 'ERROR: save_gammas must be set to True, true, False, or false! Exiting...'
 					print huh
 			if split_line[0] == 'secular':
 				if split_line[1] == 'false':

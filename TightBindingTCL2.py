@@ -409,11 +409,23 @@ class TightBindingTCL:
 							if (a == b and c != d) or (c == d and a != b):
 								self.secular_mat[a,b,c,d] = 0
 
-		if self.markovian == True:
+		if self.markovian or Params.save_gammas:
 			self.build_markovian_gammas()
 
 		GoodMkdir("./Figures"+Params.SystemName+ Params.start_time)
 		GoodMkdir("./Output"+Params.SystemName+ Params.start_time)	
+
+		if Params.save_gammas:
+			np.save('./Output'+Params.SystemName+ Params.start_time+'/G1.npy',self.G1)
+			np.save('./Output'+Params.SystemName+ Params.start_time+'/G2.npy',self.G2)
+			np.save('./Output'+Params.SystemName+ Params.start_time+'/G3.npy',self.G3)
+			np.save('./Output'+Params.SystemName+ Params.start_time+'/G4.npy',self.G4)
+			if not self.markovian:
+				self.G1 = np.zeros(shape=(Params.dim,Params.dim,Params.dim,Params.dim),dtype=complex)
+				self.G2 = np.zeros(shape=(Params.dim,Params.dim,Params.dim,Params.dim),dtype=complex)
+				self.G3 = np.zeros(shape=(Params.dim,Params.dim,Params.dim,Params.dim),dtype=complex)
+				self.G4 = np.zeros(shape=(Params.dim,Params.dim,Params.dim,Params.dim),dtype=complex)				
+
 		os.system('cp TCL.input Output' + Params.SystemName + Params.start_time+ '/')
 		os.system('cp -r ' + SD_dir + '/* Output'+ Params.SystemName + Params.start_time+ '/')
 		np.savetxt('./Output'+Params.SystemName+ Params.start_time+'/RunParams.txt',[0],fmt='%.18e')
