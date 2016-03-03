@@ -34,6 +34,12 @@ def DL(w, g, l, O):
 def thermal_reorg(g, l, O, beta):
 	return 2*l*(np.arctan((1-beta*O)/(beta*g)) + np.arctan((1+beta*O)/(beta*g)))/np.pi
 
+def gau(x,s,mu):
+	return np.exp(-0.5*((x-mu)/s)**2)/(s*np.sqrt(2*np.pi))
+
+def FC(S,v):
+	return S**(v/2.0)*np.exp(-S/2.0)/np.sqrt(math.factorial(v))
+
 class TightBindingTCL: 
 	def __init__(self):
 
@@ -53,11 +59,47 @@ class TightBindingTCL:
 		mustr = []
 		SD_dir = ''
 		AuPerWavenumber = 4.5563e-6
-		Hsys = np.zeros(shape=(Params.dim,Params.dim)) 
+		Hsys = np.zeros(shape=(Params.orig_dim,Params.orig_dim)) 
 		H_elements_set = 0
 		myinput = open('TCL.input')
+		vrtemp = 0
+		for ii in range(len(Params.vibronic)):
+			if ii%2 == 1:
+				if Params.vibronic[ii] > 0:
+					vrtemp += 1
+		occ_vibs = np.zeros(2*vrtemp)
+		ov_index = 0
+		for ii in range(len(Params.vibronic)):
+			if ii%2 == 1:
+				if Params.vibronic[ii] > 0:
+					occ_vibs[ov_index] = Params.vibronic[ii-1]
+					occ_vibs[ov_index+1] = Params.vibronic[ii]
+					ov_index += 2
+		vib_reorgs = np.zeros(shape=(vrtemp,Params.orig_dim-1))
+		vr_index = 0
+		dipoles_set = 0
+		pulse_width = 0
+		pulse_center = 0
+		trans_dipole_mat = np.zeros(shape=(Params.orig_dim-1,3))
+		elec_field_vector = np.zeros(3)
 		for line in myinput:
 			split_line = line.split()
+			if split_line[0] == 'pulse_center':
+				pulse_center = float(split_line[1])
+			if split_line[0] == 'pulse_width':
+				pulse_width = float(split_line[1])
+			if split_line[0] == 'elec_field_vector':
+				elec_field_vector[0] = int(split_line[1])
+				elec_field_vector[1] = int(split_line[2])
+				elec_field_vector[2] = int(split_line[3])
+			if split_line[0] == 'vib_reorg':
+				if len(split_line) != Params.orig_dim + 1:
+					print 'ERROR: Wrong number of elements for vib_reorg input. Exiting...'
+					print huh
+				if Params.vibronic[int(split_line[1])*2-1] != 0:
+					for ii in range(len(split_line)-2):
+						vib_reorgs[vr_index,ii] = float(split_line[ii+2])
+					vr_index += 1
 			if split_line[0] == 'dipole':
 				for ii in range(1,len(split_line)):
 					mustr += [float(split_line[ii])]
@@ -65,6 +107,11 @@ class TightBindingTCL:
 				SD_dir = split_line[1]
 				if SD_dir[-1:] != '/':
 					SD_dir = SD_dir + '/'
+			if split_line[0] == 'transition_dipole':
+				trans_dipole_mat[int(split_line[1])-1,0] = float(split_line[2])
+				trans_dipole_mat[int(split_line[1])-1,1] = float(split_line[3])
+				trans_dipole_mat[int(split_line[1])-1,2] = float(split_line[4])
+				dipoles_set += 1
 			if split_line[0] == 'ham':
 				if Hsys[int(split_line[1]),int(split_line[2])] != 0:
 					print 'ERROR: Element ' + split_line[1] + ',' + split_line[2] +' already set!' 
@@ -78,37 +125,63 @@ class TightBindingTCL:
 					Hsys[int(split_line[1]),int(split_line[2])] = float(split_line[3])*AuPerWavenumber
 					Hsys[int(split_line[2]),int(split_line[1])] = float(split_line[3])*AuPerWavenumber
 				H_elements_set += 1
-		if H_elements_set != ((Params.dim-1)*(Params.dim-1)-(Params.dim-1))/2 + (Params.dim-1):
+		if H_elements_set != ((Params.orig_dim-1)*(Params.orig_dim-1)-(Params.orig_dim-1))/2 + (Params.orig_dim-1):
 			print 'ERROR: Number of Hsys elements set not correct!'
 			print huh
-	
-		if len(mustr) != Params.dim:
-			print 'ERROR: Dipole not set correctly! Check input file.'
-			print huh
-
-		self.field = 0.01
 
 		EvPerAu = 27.2113
 		Kb = 8.61734315e-5/EvPerAu
 		self.beta = (1.0/(Kb*Temp)) # Define beta, units of 1/Hartree
-	
-		self.VNow = StateVector()
-		self.VNow["abs"] = np.zeros(shape=(Params.dim,Params.dim),dtype = complex)
-		self.VNow["coh"] = np.zeros(shape=(Params.dim,Params.dim),dtype = complex)
-		self.VNow["pop"] = np.zeros(shape=(Params.dim,Params.dim),dtype = complex)
-		self.V0 = self.VNow.clone()
 
-		self.Mu = np.zeros(shape=(Params.dim,Params.dim))
-		for ii in range(1,len(mustr)):
-			self.V0["abs"][ii,0] = mustr[ii]*self.field
-			self.Mu[0,ii] = mustr[ii]*self.field
+		vib_list = [np.zeros(1+vrtemp)]
+		for ii in range(vrtemp):
+			for jj in range(int(occ_vibs[ii*2+1])):
+				mytemp = np.zeros(1+vrtemp)
+				mytemp[0] += (jj+1)*occ_vibs[ii*2]
+				mytemp[ii+1] += (jj+1)
+				vib_list += [mytemp]
+				kk = 0
+				while kk < len(vib_list):
+					potential_state = mytemp + vib_list[kk]
+					if potential_state[ii+1] == mytemp[ii+1]:
+						found = False
+						for ll in range(len(vib_list)):
+							this_same = True
+							for mm in range(vrtemp+1):
+								if potential_state[mm] == vib_list[ll][mm]:
+									this_same = this_same and True
+								else:
+									this_same = this_same and False
+							found = this_same
+						if not found:
+							vib_list += [potential_state]
+					kk += 1
+
+		if len(vib_list) != Params.vib_mult:
+			print 'ERROR: Vibrational states not set up correctly. Exiting...'
+			print huh
+
+		fc_factors = np.ones(shape=(Params.orig_dim-1,Params.vib_mult))
+		for kk in range(Params.orig_dim-1):
+			temp = np.ones(Params.vib_mult)
+			for ii in range(Params.vib_mult):
+				for jj in range(len(vib_list[ii])-1):
+					temp[ii] *= FC(vib_reorgs[jj,kk]/occ_vibs[jj*2],vib_list[ii][jj+1])#**2
+			fc_factors[kk] = temp
+
+		# print fc_factors
+		# print huh
+		# print 'vib_reorgs = ',vib_reorgs
+		# print 'occ_vibs = ',occ_vibs
+		# print 'vib_list = ',vib_list
+		# print huh
 
 		import csv
 		self.peak_params = []
 		self.prev_first_terms = []
 		self.PV_rec = []
 
-		for ii in range(Params.dim-1):
+		for ii in range(Params.orig_dim-1):
 			reorg_so_far = 0.0
 			self.peak_params.append([])
 			self.prev_first_terms.append([])
@@ -129,27 +202,160 @@ class TightBindingTCL:
 			elif Params.const_reorg and Params.const_reorg_type == 2:
 				Hsys[ii+1,ii+1] += AuPerWavenumber*Params.const_reorg_vals[ii]-reorg_so_far
 		print 'Number of peaks:'
-		for ii in range(Params.dim-1):
+		for ii in range(Params.orig_dim-1):
 			print len(self.peak_params[ii])/3
 
 
-		self.evecs = np.linalg.eigh(Hsys)[1]
+		self.Hsys = []
+		if occ_vibs != []:
+			self.Hsys = np.zeros(shape=(Params.dim,Params.dim))
+			vib_trans_dipole_mat = np.zeros(shape=(Params.dim-1,3))
+			for ii in range(Params.orig_dim-1):
+				for jj in range(Params.orig_dim-1):
+					if ii == jj:
+						for kk in range(Params.vib_mult):
+							self.Hsys[1+ii*Params.vib_mult+kk,1+ii*Params.vib_mult+kk] = Hsys[1+ii,1+ii] + vib_list[kk][0]*AuPerWavenumber
+					else:
+						for kk in range(Params.vib_mult):
+							for ll in range(Params.vib_mult):
+								mytemp = Hsys[1+ii,1+jj]
+								for mm in range(vrtemp):
+									mytemp *= FC(vib_reorgs[mm,ii]/occ_vibs[mm*2],vib_list[kk][mm+1])
+									mytemp *= FC(vib_reorgs[mm,jj]/occ_vibs[mm*2],vib_list[ll][mm+1])
+								self.Hsys[1+ii*Params.vib_mult+kk,1+jj*Params.vib_mult+ll] = mytemp
+			real_peak_params = []
+			self.PV_rec = []
+			self.prev_first_terms = []
+			for ii in range(Params.dim-1):
+				real_peak_params.append([])
+				self.prev_first_terms.append([])
+				self.PV_rec.append([])
+			for ii in range(Params.orig_dim-1):
+				for jj in range(Params.vib_mult):
+					real_peak_params[ii*Params.vib_mult+jj] = self.peak_params[ii]
+					vib_trans_dipole_mat[ii*Params.vib_mult+jj] = trans_dipole_mat[ii]*fc_factors[ii,jj]
+			self.peak_params = real_peak_params
+			trans_dipole_mat = vib_trans_dipole_mat
+
+		if self.Hsys == []:
+			print 'Not vibronic!'
+			self.Hsys = Hsys
+
+		# writer = csv.writer(open('Hvib.csv','w'))
+		# writer.writerows(self.Hsys)
+		# print huh
+		# for ii in range(1,Params.dim):
+		# 	for jj in range(ii,Params.dim):
+		# 		print 'ham ' + str(ii) + ' ' + str(jj) + ' ' + str(self.Hsys[ii,jj]/AuPerWavenumber)
+		# print huh
+
+		self.evecs = np.linalg.eigh(self.Hsys)[1]
 		self.invevecs = np.linalg.inv(self.evecs)
 
 		Params.evecs = self.evecs
 		Params.invevecs = self.invevecs
 
-		self.Hsys = np.dot(np.dot(self.invevecs,Hsys),self.evecs)
+		orig_diag = np.diag(self.Hsys)
+		self.Hsys = np.dot(np.dot(self.invevecs,self.Hsys),self.evecs)
 		Hsysdiag = np.diag(self.Hsys)
 
-		self.Mu = np.dot(np.dot(self.invevecs,self.Mu),self.evecs)
+		# print Hsysdiag/AuPerWavenumber
+		# print huh
 
-		self.V0["abs"] = np.dot(np.dot(self.invevecs,self.V0["abs"]),self.evecs)
-		self.V0["pop"][Params.populations[0],Params.populations[1]] = 1.0
-		self.V0["pop"] = np.dot(np.dot(self.invevecs,self.V0["pop"]),self.evecs)
+		eigen_trans_dipole_mat = np.zeros(shape=(Params.dim-1,3))
+		# print orig_diag/AuPerWavenumber
+		# print Hsysdiag/AuPerWavenumber
+		# for ii in range(len(self.evecs)):
+		# 	print self.evecs[:,ii]**2
+		# print self.evecs**2
+		# print np.sum(self.evecs[:,2]**2)
+		# print huh
+		# print trans_dipole_mat
+		for ii in range(Params.dim-1):
+			# print ii
+			for jj in range(Params.dim-1):
+				# print self.evecs[1+jj,1+ii]**2
+				# print trans_dipole_mat[jj]
+				eigen_trans_dipole_mat[ii] += trans_dipole_mat[jj]*self.evecs[1+jj,1+ii]#**2
+			# print
+			# print eigen_trans_dipole_mat[ii]
+			# print
+		# print eigen_trans_dipole_mat
+
+
+		if len(mustr) == Params.orig_dim and Params.vib_mult > 1:
+			print 'ERROR: Transition dipole cannot be set with a single vector when also including an explicit vibration. Please instead input transition dipole vectors for each site using the transition_dipole input. Exiting...'
+			print huh
+		if len(mustr) != Params.dim and dipoles_set != Params.orig_dim-1:
+			print 'Dipole not being propagated!'
+			mustr = np.zeros(Params.dim)
+		elif dipoles_set == Params.orig_dim-1:
+			mustr = np.zeros(Params.dim)
+			for ii in range(Params.dim-1):
+				# mustr[ii+1] = np.dot(eigen_trans_dipole_mat[ii],eigen_trans_dipole_mat[ii])
+				mustr[ii+1] = np.dot(eigen_trans_dipole_mat[ii],elec_field_vector)
+
+		# print mustr
+		# print huh
+
+		self.VNow = StateVector()
+		self.VNow["abs"] = np.zeros(shape=(Params.dim,Params.dim),dtype = complex)
+		self.VNow["coh"] = np.zeros(shape=(Params.dim,Params.dim),dtype = complex)
+		self.VNow["pop"] = np.zeros(shape=(Params.dim,Params.dim),dtype = complex)
+		self.V0 = self.VNow.clone()
+
+		self.field = 1.0
+		self.Mu = np.zeros(shape=(Params.dim,Params.dim))
+		for ii in range(1,len(mustr)):
+			self.V0["abs"][ii,0] = mustr[ii]*self.field
+			self.Mu[0,ii] = mustr[ii]*self.field
+
+
+		# self.Mu = np.dot(np.dot(self.invevecs,self.Mu),self.evecs)
+
+		# self.V0["abs"] = np.dot(np.dot(self.invevecs,self.V0["abs"]),self.evecs)
+		if pulse_width != 0 and pulse_center != 0:
+			init_pop = np.zeros(Params.dim)
+			for ii in range(1,Params.dim):
+				init_pop[ii] = (mustr[ii]*gau(Hsysdiag[ii]/AuPerWavenumber,pulse_width/4.29193,pulse_center))**2
+			init_pop /= np.sum(init_pop)
+			for ii in range(1,Params.dim):
+				self.V0["pop"][ii,ii] = init_pop[ii]
+			# print trans_dipole_mat
+			# print self.evecs
+			# print eigen_trans_dipole_mat
+			# print Hsysdiag/AuPerWavenumber
+			# print mustr
+			# print init_pop
+			# print huh
+		else:
+			pop_site = Params.populations[0]
+			if pop_site > (Params.dim-1):
+				print 'ERROR: Initial site for population propagation must never be above the total number of system sites. Exiting...'
+				print huh
+			if pop_site > (Params.orig_dim-1) and Params.pop_type == 0:
+				print 'ERROR: Initial site for population propagation must be <= sites when pop_type = 0. Exiting...'
+				print huh
+			if Params.vib_mult == 1 or Params.pop_type == 1:
+				self.V0["pop"][pop_site,pop_site] = 1.0
+			else:
+				pop_site = pop_site - 1
+				init_pop = np.ones(Params.vib_mult)
+				for ii in range(Params.vib_mult):
+					for jj in range(len(vib_list[ii])-1):
+						init_pop[ii] *= FC(vib_reorgs[jj,pop_site]/occ_vibs[jj*2],vib_list[ii][jj+1])**2
+				print 'Sum of init_pop = ' + str(np.sum(init_pop)) + '. If this is much below 1 then we are not including enough vibrational states given the present Huang-Rhys factors.'
+				init_pop /= np.sum(init_pop)
+				print init_pop
+				for ii in range(Params.vib_mult):
+					self.V0["pop"][1+pop_site*Params.vib_mult+ii,1+pop_site*Params.vib_mult+ii] = init_pop[ii]
+			if Params.pop_type == 0:
+				self.V0["pop"] = np.dot(np.dot(self.invevecs,self.V0["pop"]),self.evecs)
 		self.V0["coh"][Params.coherences[0],Params.coherences[1]] = 1.0
 		if Params.coh_type == 0:
 			self.V0["coh"] = np.dot(np.dot(self.invevecs,self.V0["coh"]),self.evecs)
+
+		# print huh
 		
 		self.eps = np.zeros(shape=(Params.dim-1,Params.dim-1))
 		for ii in range(1,Params.dim):

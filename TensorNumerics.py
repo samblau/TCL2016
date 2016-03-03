@@ -40,18 +40,23 @@ class CalculationParameters:
 
 		self.start_time = '_' +str(time.ctime().split()[3])
 		self.dim = 0
+		self.orig_dim = 0
 		self.const_reorg = False
 		siteE = []
+		self.populations = []
 		self.SD_range = 1800
 		self.SD_bot = 0
 		self.Duration = 1.5
 		self.step_input = 0.00015
 		self.coh_type = 0
+		self.pop_type = 0
 		self.MarkovApprox = True
 		self.save_dens = False
 		self.save_gammas = False
 		self.SecularApproximation = True
 		self.Temperature = 295.0
+		self.vibronic = []
+		self.vib_mult = 1
 		myinput = open('TCL.input')
 		for line in myinput:
 			split_line = line.split()
@@ -76,6 +81,8 @@ class CalculationParameters:
 				self.step_input = float(split_line[1])
 			if split_line[0] == 'coh_type':
 				self.coh_type = int(split_line[1])
+			if split_line[0] == 'pop_type':
+				self.pop_type = int(split_line[1])
 			if split_line[0] == 'markov':
 				if split_line[1] == 'false':
 					self.MarkovApprox = False
@@ -132,6 +139,16 @@ class CalculationParameters:
 				self.Temperature = float(split_line[1])
 			if split_line[0] == 'sites':
 				self.dim = int(split_line[1])+1
+				self.orig_dim = int(split_line[1])+1
+			if split_line[0] == 'vibronic':
+				self.vibronic = numpy.zeros(len(split_line)-1)
+				for ii in range(len(split_line)-1):
+					self.vibronic[ii] = float(split_line[ii+1])
+					if ii%2 == 1:
+						self.vib_mult *= 1+int(self.vibronic[ii])
+				print 'Vibronic multiplier:', self.vib_mult
+				self.dim = 1+(self.dim-1)*self.vib_mult
+				# print self.dim
 			if split_line[0] == 'const_reorg':
 				self.const_reorg = True
 				self.const_reorg_type = int(split_line[1])
@@ -147,8 +164,10 @@ class CalculationParameters:
 			print 'ERROR: Number of system sites not set correctly! Check the energies entry in the input! Exiting...'
 			print huh
 
-		self.globalscale = min(siteE)-400
-		self.upperlimit = max(siteE)+500
+		self.globalscale = 0#min(siteE)-1000
+		self.upperlimit = max(siteE)+10000
+		for ii in range(len(self.vibronic)/2):
+			self.upperlimit += self.vibronic[ii*2] * self.vibronic[ii*2+1]
 		self.nocc = 4
 		self.nvirt = 4
 		self.nmo = 8    # These will be determined on-the-fly reading from disk anyways. 
@@ -188,8 +207,10 @@ class CalculationParameters:
 
 		# self.Temperature = 77.0
 		# self.TMax = 50000.0 
-		self.TMax = float(int(self.Duration/0.00002418884326))
-		self.TStep = float(int(self.step_input/0.00002418884326))
+		self.time_constant = 0.00002418884326
+		# self.time_constant = 0.00000002418884326
+		self.TMax = float(int(self.Duration/self.time_constant))
+		self.TStep = float(int(self.step_input/self.time_constant))
 		self.tol = 1e-9
 		self.Safety = 0.9 #Ensures that if Error = Emax, the step size decreases slightly
 		self.RK45 = False

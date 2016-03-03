@@ -141,8 +141,8 @@ class Propagator_TD(Propagator):
 			# if Params.pop:
 			# 	popVNow = np.dot(np.dot(Params.evecs,self.VNow["coh"]),Params.invevecs)
 			popVNow = np.dot(np.dot(Params.evecs,self.VNow["pop"]),Params.invevecs)
-			
-			self.TimesEvaluated.append(self.TNow*0.00002418884326)
+
+			self.TimesEvaluated.append(self.TNow*Params.time_constant)
 			# if (self.Field == None): 
 			# 	# Only collect dipoles for fourier transform if the field is off. 
 			# 	self.Dipoles[Step] = numpy.real(self.ShortTimePropagator.DipoleMoment(self.VNow,self.TNow))		
@@ -167,7 +167,7 @@ class Propagator_TD(Propagator):
 			if Params.Parallel == False:
 				#print abs(self.Populations[Step,:])
 				# print self.Norms[Step]
-				myprint = "T: " + str(self.TNow*0.00002418884326) + " ps  Mu: " + str(round(self.Dipoles[Step],4))
+				myprint = "T: " + str(self.TNow*Params.time_constant) + " ps  Mu: " + str(round(self.Dipoles[Step],4))
 				for ii in range(Params.dim-1):
 					myprint += "  |P" + str(ii+1) + "| " + str(round(self.Populations[Step,ii],4))
 				myprint += "  Total " + str(round(np.sum(self.Populations[Step,:]),4)) + "  WallMinToGo: " + str(round(((Params.TMax-self.TNow)/Params.TStep)*(TimingEnd-TimingStart)/60.0))
@@ -248,13 +248,20 @@ class Propagator_TD(Propagator):
 		import matplotlib.pylab as lab
 
 
+		colors = ['blue','green','red','magenta','saddlebrown','orange','darkturquoise','yellowgreen','dodgerblue','darkolivegreen']
+		styles = ['solid','dashed','dashdot','dotted','dashed','dashdot','dotted','dashed','dashdot','dotted']
 		# print self.Populations[:,3]
 		self.Populations.resize(len(self.TimesEvaluated),Params.dim-1)
 		fig = plt.figure()
 		#plt.plot(self.TimesEvaluated,self.Populations[:,3])
 		fig.hold()
-		for ii in range(0,Params.dim-1):
-			plt.plot(self.TimesEvaluated,self.Populations[:,ii],linewidth=2)
+		if Params.vib_mult == 1:
+			for ii in range(Params.dim-1):
+				plt.plot(self.TimesEvaluated,self.Populations[:,ii],c=colors[ii],linewidth=2)
+		else:
+			for ii in range(Params.orig_dim-1):
+				for jj in range(Params.vib_mult):
+					plt.plot(self.TimesEvaluated,self.Populations[:,ii*Params.vib_mult+jj],c=colors[ii],ls=styles[jj],linewidth=2)
 		#plt.ylim(0,1)
 		myleg = []
 		for ii in range(Params.dim-1):
@@ -264,9 +271,34 @@ class Propagator_TD(Propagator):
 
 		plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
 		plt.ylabel('Site Populations',fontsize = Params.LabelFontSize)
-		plt.xlim(0,(Params.TMax+1)*0.00002418884326)
+		plt.xlim(0,(Params.TMax+1)*Params.time_constant)
 		plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Populations')
 		plt.clf()
+
+		if Params.vib_mult != 1:
+			orig_pops = np.zeros(shape=(len(self.TimesEvaluated),Params.orig_dim-1))
+			for ii in range(len(self.TimesEvaluated)):
+				for jj in range(Params.orig_dim-1):
+					for kk in range(Params.vib_mult):
+						orig_pops[ii][jj] += self.Populations[ii][jj*Params.vib_mult+kk]
+
+			fig = plt.figure()
+			#plt.plot(self.TimesEvaluated,self.Populations[:,3])
+			fig.hold()
+			for ii in range(0,Params.orig_dim-1):
+				plt.plot(self.TimesEvaluated,orig_pops[:,ii],c=colors[ii],linewidth=2)
+			#plt.ylim(0,1)
+			myleg = []
+			for ii in range(Params.orig_dim-1):
+				myleg = np.concatenate((myleg,[str(ii+1)]))
+			plt.legend(myleg)
+			# plt.legend(['DBVc','DBVd','MBVa','MBVb','PCBc158','PCBd158','PCBc82','PCBd82']) # MAKE PRETTY PLOTS HERE
+
+			plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
+			plt.ylabel('Site Populations',fontsize = Params.LabelFontSize)
+			plt.xlim(0,(Params.TMax+1)*Params.time_constant)
+			plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Populations_orig')
+			plt.clf()
 
 		self.MarkovianRec.resize(len(self.TimesEvaluated),Params.dim-1)
 		fig = plt.figure()
@@ -277,10 +309,11 @@ class Propagator_TD(Propagator):
 		#plt.ylim(0,1)
 		# plt.legend(['1','2','3','4','5','6','7'])
 		plt.legend(myleg)
+		# plt.legend(['DBVc','DBVd','MBVa','MBVb','PCBc158','PCBd158','PCBc82','PCBd82'])
 
 		plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
 		plt.ylabel('Markovianity',fontsize = Params.LabelFontSize)
-		plt.xlim(0,(Params.TMax+1)*0.00002418884326)
+		plt.xlim(0,(Params.TMax+1)*Params.time_constant)
 		plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Markovian')
 		plt.clf()
 
@@ -346,7 +379,7 @@ class Propagator_TD(Propagator):
 			plt.setp(l1,linewidth=2, color='r')
 			plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
 			plt.ylabel('|State|',fontsize = Params.LabelFontSize)
-			plt.xlim(0,(Params.TMax+1)*0.00002418884326)
+			plt.xlim(0,(Params.TMax+1)*Params.time_constant)
 			plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'NormOfState')
 			plt.clf()
 
@@ -354,7 +387,7 @@ class Propagator_TD(Propagator):
 			plt.setp(l1,linewidth=2, color='r')
 			plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
 			plt.ylabel('Coherence',fontsize = Params.LabelFontSize)
-			plt.xlim(0,(Params.TMax+1)*0.00002418884326)
+			plt.xlim(0,(Params.TMax+1)*Params.time_constant)
 			plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Coherences')
 			plt.clf()
 
@@ -366,7 +399,7 @@ class Propagator_TD(Propagator):
 				plt.legend(['x','y','z'],loc=2)
 				plt.xlabel('Time (ps)',fontsize = Params.LabelFontSize)
 				plt.ylabel('Mu (au)',fontsize = Params.LabelFontSize)
-				plt.xlim(0,(Params.TMax+1)*0.00002418884326)
+				plt.xlim(0,(Params.TMax+1)*Params.time_constant)
 				plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Dipole')
 				plt.clf()
 				Nrm = lambda X: (X[0]*X[0]+X[1]*X[1]+X[2]*X[2])
@@ -377,7 +410,7 @@ class Propagator_TD(Propagator):
 				plt.setp(l1,linewidth=2, color='r')
 				plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
 				plt.ylabel('|Mu|',fontsize = Params.LabelFontSize)
-				plt.xlim(0,(Params.TMax+1)*0.00002418884326)
+				plt.xlim(0,(Params.TMax+1)*Params.time_constant)
 				plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Dipole')
 				plt.clf()
 				print "Proc " + str(self.proc_index) + " building spectra"

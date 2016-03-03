@@ -93,8 +93,8 @@ def SpectralAnalysis(Arg_Data,Arg_SampleInterval,DesiredZoom = 1.0/30.0,Title = 
 	if Params.Parallel == False:
 		print "Generalized FFT result: ", numpy.sum(CplxStrengths*CplxStrengths.conj())
 	
-	MakeSimplePlot(CplxStrengths.real[0:300],tit=Title+"RealStrengths")
-	MakeSimplePlot(CplxStrengths.imag[0:300],tit=Title+"ImStrengths")
+	MakeSimplePlot(CplxStrengths.real[0:3000],tit=Title+"RealStrengths")
+	MakeSimplePlot(CplxStrengths.imag[0:3000],tit=Title+"ImStrengths")
 	CplxStrengths = CplxStrengths[:len(Freqs)] # I bet the problem is the negative frequencies... 
 	import scipy.special
 	# Damp out the low frequency information. 
@@ -103,8 +103,9 @@ def SpectralAnalysis(Arg_Data,Arg_SampleInterval,DesiredZoom = 1.0/30.0,Title = 
 #	CplxStrengths = CplxStrengths*Damping
 	
 	numpy.savetxt('./Output'+Params.SystemName+ Params.start_time+'/FFTStrengths',CplxStrengths,fmt='%.18e')	
-	Strengths = CplxStrengths.real
-		
+	# Strengths = CplxStrengths.real
+	Strengths = CplxStrengths.imag
+
 	import matplotlib
 	import matplotlib.pyplot as plt
 	import matplotlib.font_manager as fnt
