@@ -100,9 +100,9 @@ class TightBindingTCL:
 					for ii in range(len(split_line)-2):
 						vib_reorgs[vr_index,ii] = float(split_line[ii+2])
 					vr_index += 1
-			if split_line[0] == 'dipole':
-				for ii in range(1,len(split_line)):
-					mustr += [float(split_line[ii])]
+			# if split_line[0] == 'dipole':
+			# 	for ii in range(1,len(split_line)):
+			# 		mustr += [float(split_line[ii])]
 			if split_line[0] == 'SD_dir':
 				SD_dir = split_line[1]
 				if SD_dir[-1:] != '/':
@@ -242,12 +242,22 @@ class TightBindingTCL:
 			self.Hsys = Hsys
 
 		# writer = csv.writer(open('Hvib.csv','w'))
-		# writer.writerows(self.Hsys)
+		# writer.writerows(self.Hsys/AuPerWavenumber)
 		# print huh
-		# for ii in range(1,Params.dim):
-		# 	for jj in range(ii,Params.dim):
-		# 		print 'ham ' + str(ii) + ' ' + str(jj) + ' ' + str(self.Hsys[ii,jj]/AuPerWavenumber)
+		if Params.print_H:
+			print
+			print "Printing Hamiltonian..."
+			for ii in range(1,Params.dim):
+				for jj in range(1,Params.dim):
+					print 'Ham:' + str(ii-1) + ':' + str(jj-1) + '=' + str(self.Hsys[ii,jj]/AuPerWavenumber)
+			print
+				# if ii == jj:
+				# 	# print 'print "Ham:' + str(ii-1) + ':' + str(jj-1) + '=' + str(self.Hsys[ii,ii]/AuPerWavenumber-15000.0) + '"'
+				# 	print 'print "Ham:' + str(ii-1) + ':' + str(jj-1) + '=' + str(self.Hsys[ii,ii]/AuPerWavenumber) + '"'
+				# else:
+				# 	print 'print "Ham:' + str(ii-1) + ':' + str(jj-1) + '=' + str(self.Hsys[ii,jj]/AuPerWavenumber) + '"'
 		# print huh
+
 
 		self.evecs = np.linalg.eigh(self.Hsys)[1]
 		self.invevecs = np.linalg.inv(self.evecs)
@@ -283,77 +293,141 @@ class TightBindingTCL:
 		# print eigen_trans_dipole_mat
 
 
-		if len(mustr) == Params.orig_dim and Params.vib_mult > 1:
-			print 'ERROR: Transition dipole cannot be set with a single vector when also including an explicit vibration. Please instead input transition dipole vectors for each site using the transition_dipole input. Exiting...'
-			print huh
-		if len(mustr) != Params.dim and dipoles_set != Params.orig_dim-1:
-			print 'Dipole not being propagated!'
-			mustr = np.zeros(Params.dim)
-		elif dipoles_set == Params.orig_dim-1:
-			mustr = np.zeros(Params.dim)
-			for ii in range(Params.dim-1):
-				# mustr[ii+1] = np.dot(eigen_trans_dipole_mat[ii],eigen_trans_dipole_mat[ii])
-				mustr[ii+1] = np.dot(eigen_trans_dipole_mat[ii],elec_field_vector)
+		# if len(mustr) == Params.orig_dim and Params.vib_mult > 1:
+		# 	print 'ERROR: Transition dipole cannot be set with a single vector when also including an explicit vibration. Please instead input transition dipole vectors for each site using the transition_dipole input. Exiting...'
+		# 	print huh
+		# if len(mustr) != Params.dim and dipoles_set != Params.orig_dim-1:
+		# 	print 'Dipole not being propagated!'
+		# 	mustr = np.zeros(Params.dim)
+		if (Params.do_abs or (Params.do_pop and pulse_center != 0)) and dipoles_set != Params.orig_dim-1:
+			print 'ERROR: Wrong number of transition dipoles set! Exiting...'
+		elif (Params.do_abs or (Params.do_pop and pulse_center != 0)) and dipoles_set == Params.orig_dim-1:
+			if Params.DirectionSpecific:
+				mustr = np.zeros(shape=(3,Params.dim))
+				for jj in range(3):
+					temp_efield_vec = np.zeros(3)
+					temp_efield_vec[jj] = 1.0
+					for ii in range(Params.dim-1):
+						mustr[jj,ii+1] = np.dot(eigen_trans_dipole_mat[ii],temp_efield_vec)
+			else:
+				mustr = np.zeros(Params.dim)
+				for ii in range(Params.dim-1):
+					# mustr[ii+1] = np.dot(eigen_trans_dipole_mat[ii],eigen_trans_dipole_mat[ii])
+					mustr[ii+1] = np.dot(eigen_trans_dipole_mat[ii],elec_field_vector)
 
 		# print mustr
 		# print huh
 
+		self.num_rho = Params.do_abs+Params.do_coh+Params.do_pop
+		# print 'self.num_rho = ' + str(self.num_rho)
+		if Params.DirectionSpecific:
+			self.num_rho += 2
+
+		self.pop_index = 1000
+		self.coh_index = 1001
+		self.abs_index = 1002
+		if Params.do_pop:
+			self.pop_index = 0
+			if Params.do_coh:
+				self.coh_index = 1
+				if Params.do_abs:
+					self.abs_index = 2
+			elif Params.do_abs:
+				self.abs_index = 1
+		elif Params.do_coh:
+			self.coh_index = 0
+			if Params.do_abs:
+				self.abs_index = 1
+		elif Params.do_abs:
+			self.abs_index = 0
+
+		Params.abs_index = self.abs_index
+		Params.pop_index = self.pop_index
+		Params.coh_index = self.coh_index
+
 		self.VNow = StateVector()
-		self.VNow["abs"] = np.zeros(shape=(Params.dim,Params.dim),dtype = complex)
-		self.VNow["coh"] = np.zeros(shape=(Params.dim,Params.dim),dtype = complex)
-		self.VNow["pop"] = np.zeros(shape=(Params.dim,Params.dim),dtype = complex)
+		# self.VNow["abs"] = np.zeros(shape=(Params.dim,Params.dim),dtype = complex)
+		# self.VNow["coh"] = np.zeros(shape=(Params.dim,Params.dim),dtype = complex)
+		# self.VNow["pop"] = np.zeros(shape=(Params.dim,Params.dim),dtype = complex)
+		self.VNow["all_rho"] = np.zeros(shape=(self.num_rho,Params.dim,Params.dim),dtype = complex)
 		self.V0 = self.VNow.clone()
 
 		self.field = 1.0
-		self.Mu = np.zeros(shape=(Params.dim,Params.dim))
-		for ii in range(1,len(mustr)):
-			self.V0["abs"][ii,0] = mustr[ii]*self.field
-			self.Mu[0,ii] = mustr[ii]*self.field
+		if Params.do_abs:
+			if not Params.DirectionSpecific:
+				self.Mu = np.zeros(shape=(Params.dim,Params.dim))
+				for ii in range(1,len(mustr)):
+					# self.V0["abs"][ii,0] = mustr[ii]*self.field
+					self.V0["all_rho"][self.abs_index,ii,0] = mustr[ii]*self.field
+					self.Mu[0,ii] = mustr[ii]*self.field
+			elif Params.DirectionSpecific:
+				self.Mu = np.zeros(shape=(3,Params.dim,Params.dim))
+				for jj in range(3):
+					for ii in range(1,len(mustr[jj])):
+						self.V0["all_rho"][self.abs_index+jj,ii,0] = mustr[jj,ii]*self.field
+						self.Mu[jj,0,ii] = mustr[jj,ii]*self.field
 
 
 		# self.Mu = np.dot(np.dot(self.invevecs,self.Mu),self.evecs)
 
 		# self.V0["abs"] = np.dot(np.dot(self.invevecs,self.V0["abs"]),self.evecs)
-		if pulse_width != 0 and pulse_center != 0:
-			init_pop = np.zeros(Params.dim)
-			for ii in range(1,Params.dim):
-				init_pop[ii] = (mustr[ii]*gau(Hsysdiag[ii]/AuPerWavenumber,pulse_width/4.29193,pulse_center))**2
-			init_pop /= np.sum(init_pop)
-			for ii in range(1,Params.dim):
-				self.V0["pop"][ii,ii] = init_pop[ii]
-			# print trans_dipole_mat
-			# print self.evecs
-			# print eigen_trans_dipole_mat
-			# print Hsysdiag/AuPerWavenumber
-			# print mustr
-			# print init_pop
-			# print huh
-		else:
-			pop_site = Params.populations[0]
-			if pop_site > (Params.dim-1):
-				print 'ERROR: Initial site for population propagation must never be above the total number of system sites. Exiting...'
-				print huh
-			if pop_site > (Params.orig_dim-1) and Params.pop_type == 0:
-				print 'ERROR: Initial site for population propagation must be <= sites when pop_type = 0. Exiting...'
-				print huh
-			if Params.vib_mult == 1 or Params.pop_type == 1:
-				self.V0["pop"][pop_site,pop_site] = 1.0
-			else:
-				pop_site = pop_site - 1
-				init_pop = np.ones(Params.vib_mult)
-				for ii in range(Params.vib_mult):
-					for jj in range(len(vib_list[ii])-1):
-						init_pop[ii] *= FC(vib_reorgs[jj,pop_site]/occ_vibs[jj*2],vib_list[ii][jj+1])**2
-				print 'Sum of init_pop = ' + str(np.sum(init_pop)) + '. If this is much below 1 then we are not including enough vibrational states given the present Huang-Rhys factors.'
+
+		if Params.print_IC:
+			print "Printing initial populations on site " + str(Params.print_IC_index) + "..."
+			temp_pop_site = Params.print_IC_index - 1
+			temp_init_pop = np.ones(Params.vib_mult)
+			for ii in range(Params.vib_mult):
+				for jj in range(len(vib_list[ii])-1):
+					temp_init_pop[ii] *= FC(vib_reorgs[jj,temp_pop_site]/occ_vibs[jj*2],vib_list[ii][jj+1])**2
+			print 'Sum of init_pop = ' + str(np.sum(temp_init_pop)) + '. If this is much below 1 then we are not including enough vibrational states given the present Huang-Rhys factors.'
+			temp_init_pop /= np.sum(temp_init_pop)
+			print 'Normalized initial populations: ',temp_init_pop
+			print
+
+		if Params.do_pop:
+			if pulse_width != 0 and pulse_center != 0:
+				init_pop = np.zeros(Params.dim)
+				for ii in range(1,Params.dim):
+					init_pop[ii] = (mustr[ii]*gau(Hsysdiag[ii]/AuPerWavenumber,pulse_width/4.29193,pulse_center))**2
 				init_pop /= np.sum(init_pop)
-				print init_pop
-				for ii in range(Params.vib_mult):
-					self.V0["pop"][1+pop_site*Params.vib_mult+ii,1+pop_site*Params.vib_mult+ii] = init_pop[ii]
-			if Params.pop_type == 0:
-				self.V0["pop"] = np.dot(np.dot(self.invevecs,self.V0["pop"]),self.evecs)
-		self.V0["coh"][Params.coherences[0],Params.coherences[1]] = 1.0
-		if Params.coh_type == 0:
-			self.V0["coh"] = np.dot(np.dot(self.invevecs,self.V0["coh"]),self.evecs)
+				for ii in range(1,Params.dim):
+					self.V0["all_rho"][self.pop_index,ii,ii] = init_pop[ii]
+				# print trans_dipole_mat
+				# print self.evecs
+				# print eigen_trans_dipole_mat
+				# print Hsysdiag/AuPerWavenumber
+				# print mustr
+				# print init_pop
+				# print huh
+			else:
+				pop_site = Params.populations[0]
+				if pop_site > (Params.dim-1):
+					print 'ERROR: Initial site for population propagation must never be above the total number of system sites. Exiting...'
+					print huh
+				if pop_site > (Params.orig_dim-1) and Params.pop_type == 0:
+					print 'ERROR: Initial site for population propagation must be <= sites when pop_type = 0. Exiting...'
+					print huh
+				if Params.vib_mult == 1 or Params.pop_type == 1:
+					self.V0["all_rho"][self.pop_index,pop_site,pop_site] = 1.0
+				else:
+					pop_site = pop_site - 1
+					init_pop = np.ones(Params.vib_mult)
+					for ii in range(Params.vib_mult):
+						for jj in range(len(vib_list[ii])-1):
+							init_pop[ii] *= FC(vib_reorgs[jj,pop_site]/occ_vibs[jj*2],vib_list[ii][jj+1])**2
+					print 'Sum of init_pop = ' + str(np.sum(init_pop)) + '. If this is much below 1 then we are not including enough vibrational states given the present Huang-Rhys factors.'
+					init_pop /= np.sum(init_pop)
+					print init_pop
+					# init_pop = [1.0,0.0]
+					# print init_pop
+					for ii in range(Params.vib_mult):
+						self.V0["all_rho"][self.pop_index,1+pop_site*Params.vib_mult+ii,1+pop_site*Params.vib_mult+ii] = init_pop[ii]
+				if Params.pop_type == 0:
+					self.V0["all_rho"][self.pop_index] = np.dot(np.dot(self.invevecs,self.V0["all_rho"][self.pop_index]),self.evecs)
+		if Params.do_coh:
+			self.V0["all_rho"][self.coh_index,Params.coherences[0],Params.coherences[1]] = 1.0
+			if Params.coh_type == 0:
+				self.V0["all_rho"][self.coh_index] = np.dot(np.dot(self.invevecs,self.V0["all_rho"][self.coh_index]),self.evecs)
 
 		# print huh
 		
@@ -450,34 +524,38 @@ class TightBindingTCL:
 		# # plt.title('RE = ' + str(myreorg) + ', TRE = ' + str(mythermalreorg) + ' - both (cm^-1)')
 		# # plt.xlabel('w (cm^-1)',fontsize = Params.LabelFontSize)
 		# # plt.ylabel('J[w] (cm^-1)',fontsize = Params.LabelFontSize)
-		# # # plt.savefig("./Figures_testing/SDavg")	
-		# # plt.show()
+		# # plt.savefig("./Figures_testing/SDavg")	
+		# # # plt.show()
 		# # print huh
 		# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
 
 		wgrid = np.linspace(0,4000,4000)
-		GoodMkdir("./Figures"+Params.SystemName+ Params.start_time)
-		GoodMkdir("./Output"+Params.SystemName+ Params.start_time)	
-		for ii in range(Params.dim-1):
-			myreorg = 0.0
-			mythermalreorg = 0.0
-			jgrid = DL(wgrid,1.0,0.0,0.0)
-			for jj in range(len(self.peak_params[ii])/3):
-				g = self.peak_params[ii][jj*3]/AuPerWavenumber
-				l = self.peak_params[ii][jj*3+1]/AuPerWavenumber
-				O = self.peak_params[ii][jj*3+2]/AuPerWavenumber
-				jgrid += DL(wgrid,g,l,O)
-				myreorg += 2*l
-				mythermalreorg += thermal_reorg(g,l,O,self.beta*AuPerWavenumber)
-				# print 'sd_peak:' + str(ii)+ ':' + str(jj) + '=' + str(l) + ':' + str(5308.83662006/g) + ':' + str(O)
-			temp=plt.plot(wgrid[0:Params.SD_range],jgrid[0:Params.SD_range])
-			plt.setp(temp,linewidth=2)
-			plt.title('RE = ' + str(myreorg) + ', TRE = ' + str(mythermalreorg) + ' - both (cm^-1)')
-			plt.xlabel('w (cm^-1)',fontsize = Params.LabelFontSize)
-			plt.ylabel('J[w]/hbar (cm^-1)',fontsize = Params.LabelFontSize)
-			plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/SD" + str(ii+1))
-			plt.clf()
+		if self.num_rho != 0:
+			GoodMkdir("./Figures"+Params.SystemName+ Params.start_time)
+			GoodMkdir("./Output"+Params.SystemName+ Params.start_time)
+			writer = csv.writer(open('./Output'+Params.SystemName+ Params.start_time+'/Hvib.csv','w'))
+			writer.writerows(self.Hsys/AuPerWavenumber)
+			for ii in range(Params.dim-1):
+				myreorg = 0.0
+				mythermalreorg = 0.0
+				jgrid = DL(wgrid,1.0,0.0,0.0)
+				for jj in range(len(self.peak_params[ii])/3):
+					g = self.peak_params[ii][jj*3]/AuPerWavenumber
+					l = self.peak_params[ii][jj*3+1]/AuPerWavenumber
+					O = self.peak_params[ii][jj*3+2]/AuPerWavenumber
+					jgrid += DL(wgrid,g,l,O)
+					myreorg += 2*l
+					mythermalreorg += thermal_reorg(g,l,O,self.beta*AuPerWavenumber)
+					if Params.print_SD:
+						print 'sd_peak:' + str(ii)+ ':' + str(jj) + '=' + str(l) + ':' + str(5308.83662006/g) + ':' + str(O)
+				temp=plt.plot(wgrid[0:Params.SD_range],jgrid[0:Params.SD_range])
+				plt.setp(temp,linewidth=2)
+				plt.title('RE = ' + str(myreorg) + ', TRE = ' + str(mythermalreorg) + ' - both (cm^-1)')
+				plt.xlabel('w (cm^-1)',fontsize = Params.LabelFontSize)
+				plt.ylabel('J[w]/hbar (cm^-1)',fontsize = Params.LabelFontSize)
+				plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/SD" + str(ii+1))
+				plt.clf()
 
 
 		if self.silence == False:
@@ -618,35 +696,40 @@ class TightBindingTCL:
 		if self.markovian or Params.save_gammas:
 			self.build_markovian_gammas()
 
-		GoodMkdir("./Figures"+Params.SystemName+ Params.start_time)
-		GoodMkdir("./Output"+Params.SystemName+ Params.start_time)	
+		# GoodMkdir("./Figures"+Params.SystemName+ Params.start_time)
+		# GoodMkdir("./Output"+Params.SystemName+ Params.start_time)	
 
-		if Params.save_gammas:
-			np.save('./Output'+Params.SystemName+ Params.start_time+'/G1.npy',self.G1)
-			np.save('./Output'+Params.SystemName+ Params.start_time+'/G2.npy',self.G2)
-			np.save('./Output'+Params.SystemName+ Params.start_time+'/G3.npy',self.G3)
-			np.save('./Output'+Params.SystemName+ Params.start_time+'/G4.npy',self.G4)
-			if not self.markovian:
-				self.G1 = np.zeros(shape=(Params.dim,Params.dim,Params.dim,Params.dim),dtype=complex)
-				self.G2 = np.zeros(shape=(Params.dim,Params.dim,Params.dim,Params.dim),dtype=complex)
-				self.G3 = np.zeros(shape=(Params.dim,Params.dim,Params.dim,Params.dim),dtype=complex)
-				self.G4 = np.zeros(shape=(Params.dim,Params.dim,Params.dim,Params.dim),dtype=complex)				
+		if self.num_rho != 0:
+			if Params.save_gammas:
+				np.save('./Output'+Params.SystemName+ Params.start_time+'/G1.npy',self.G1)
+				np.save('./Output'+Params.SystemName+ Params.start_time+'/G2.npy',self.G2)
+				np.save('./Output'+Params.SystemName+ Params.start_time+'/G3.npy',self.G3)
+				np.save('./Output'+Params.SystemName+ Params.start_time+'/G4.npy',self.G4)
+				if not self.markovian:
+					self.G1 = np.zeros(shape=(Params.dim,Params.dim,Params.dim,Params.dim),dtype=complex)
+					self.G2 = np.zeros(shape=(Params.dim,Params.dim,Params.dim,Params.dim),dtype=complex)
+					self.G3 = np.zeros(shape=(Params.dim,Params.dim,Params.dim,Params.dim),dtype=complex)
+					self.G4 = np.zeros(shape=(Params.dim,Params.dim,Params.dim,Params.dim),dtype=complex)				
 
-		os.system('cp TCL.input Output' + Params.SystemName + Params.start_time+ '/')
-		os.system('cp -r ' + SD_dir + '/* Output'+ Params.SystemName + Params.start_time+ '/')
-		np.savetxt('./Output'+Params.SystemName+ Params.start_time+'/RunParams.txt',[0],fmt='%.18e')
-		f = open('./Output'+Params.SystemName+ Params.start_time+'/RunParams.txt','w')
-		mywrite = 'Num peaks = '
-		for ii in range(Params.dim-1):
-			mywrite += str(len(self.peak_params[ii])/3) + ' '
-		mywrite += '\n'
-		f.write(mywrite)
-		f.write('Markov Apprximation = ' + str(self.markovian) + '\n')
-		f.write('Tmax = ' + str(Params.TMax) + '\n')
-		f.write('TStep = ' + str(Params.TStep) + '\n')
-		f.write('Pop = ' + str(Params.populations) + '\n')
-		f.write('Coh = ' + str(Params.coherences) + '\n')
-		f.close()
+			os.system('cp TCL.input Output' + Params.SystemName + Params.start_time+ '/')
+			os.system('cp -r ' + SD_dir + '/* Output'+ Params.SystemName + Params.start_time+ '/')
+			np.savetxt('./Output'+Params.SystemName+ Params.start_time+'/RunParams.txt',[0],fmt='%.18e')
+			f = open('./Output'+Params.SystemName+ Params.start_time+'/RunParams.txt','w')
+			mywrite = 'Num peaks = '
+			for ii in range(Params.dim-1):
+				mywrite += str(len(self.peak_params[ii])/3) + ' '
+			mywrite += '\n'
+			f.write(mywrite)
+			f.write('Markov Apprximation = ' + str(self.markovian) + '\n')
+			f.write('Tmax = ' + str(Params.TMax) + '\n')
+			f.write('TStep = ' + str(Params.TStep) + '\n')
+			f.write('Pop = ' + str(Params.populations) + '\n')
+			f.write('Coh = ' + str(Params.coherences) + '\n')
+			f.close()
+
+		if self.num_rho == 0:
+			print "NOTE: No propagations selected! Exiting..."
+			print huh
 
 		self.InitAlgebra()
 		if self.silence == False:
@@ -666,13 +749,22 @@ class TightBindingTCL:
 	
 	def InitAlgebra(self): 	
 		self.VectorShape = StateVector()
-		self.VectorShape["abs"] = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
-		self.VectorShape["coh"] = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
-		self.VectorShape["pop"] = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		self.VectorShape["all_rho"] = np.zeros(shape=(self.num_rho,Params.dim,Params.dim),dtype=complex)
+		# self.VectorShape["abs"] = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		# self.VectorShape["coh"] = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		# self.VectorShape["pop"] = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
 		return 
 
 	def DipoleMoment(self,AVector,Time=0.0): 
-		return np.sum(np.diag(np.dot(self.Mu,AVector["abs"])))
+		if not Params.DirectionSpecific:
+			# print np.diag(np.dot(self.Mu,AVector["all_rho"][self.abs_index]))
+			return np.sum(np.diag(np.dot(self.Mu,AVector["all_rho"][self.abs_index])))
+		elif Params.DirectionSpecific:
+			myret = np.zeros(3,dtype=complex)
+			for jj in range(3):
+				# print np.diag(np.dot(self.Mu[jj],AVector["all_rho"][self.abs_index+jj]))
+				myret[jj] = np.sum(np.diag(np.dot(self.Mu[jj],AVector["all_rho"][self.abs_index+jj])))
+			return myret
 
 	def InitalizeNumerics(self): 
 		self.V0.MultiplyScalar(1.0/np.sqrt(self.V0.InnerProduct(self.V0)))
@@ -879,25 +971,28 @@ class TightBindingTCL:
 
 	def doublecomm(self, OldState): # This will construct the four parts of the TCL2 term that 
 		# come from the double commutator. The four terms are: Ht Hs rho - Ht rho Hs - Hs rho Ht + rho Hs Ht
-		term1_abs = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
-		term4_abs = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
-		term2_abs = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
-		term3_abs = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
-		term1_pop = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
-		term4_pop = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
-		term2_pop = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
-		term3_pop = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
-		term1_coh = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
-		term4_coh = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
-		term2_coh = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
-		term3_coh = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		# term1_abs = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		# term4_abs = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		# term2_abs = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		# term3_abs = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		# term1_pop = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		# term4_pop = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		# term2_pop = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		# term3_pop = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		# term1_coh = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		# term4_coh = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		# term2_coh = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		# term3_coh = np.zeros(shape=(Params.dim,Params.dim),dtype=complex)
+		term = np.zeros(shape=(self.num_rho,4,Params.dim,Params.dim),dtype=complex)
 		G1 = self.G1
 		G2 = self.G2
 		G3 = np.conj(self.G3)
 		G4 = np.conj(self.G4)
-		abs_state = OldState["abs"]
-		pop_state = OldState["pop"]
-		coh_state = OldState["coh"]
+		# abs_state = OldState["abs"]
+		# pop_state = OldState["pop"]
+		# coh_state = OldState["coh"]
+		state = OldState["all_rho"]
+		num_rho = self.num_rho
 		dim = Params.dim
 		# This takes the four gammas and acts on them to obtain the TCL term. 
 		code =	"""
@@ -912,38 +1007,33 @@ class TightBindingTCL:
 						{
 							for (int d = 0; d<dim; ++d)
 							{
-								term1_abs(a,b) += abs_state(d,b) * G1(a,c,c,d);
-								term4_abs(a,b) += abs_state(a,c) * G4(c,d,d,b);
-								term2_abs(a,b) += abs_state(c,d) * G2(a,c,d,b);
-								term3_abs(a,b) += abs_state(c,d) * G3(a,c,d,b);
-
-								term1_pop(a,b) += pop_state(d,b) * G1(a,c,c,d);
-								term4_pop(a,b) += pop_state(a,c) * G4(c,d,d,b);
-								term2_pop(a,b) += pop_state(c,d) * G2(a,c,d,b);
-								term3_pop(a,b) += pop_state(c,d) * G3(a,c,d,b);
-
-								term1_coh(a,b) += coh_state(d,b) * G1(a,c,c,d);
-								term4_coh(a,b) += coh_state(a,c) * G4(c,d,d,b);
-								term2_coh(a,b) += coh_state(c,d) * G2(a,c,d,b);
-								term3_coh(a,b) += coh_state(c,d) * G3(a,c,d,b);
+								for (int e = 0; e<num_rho; ++e)
+								{
+									term(e,0,a,b) += state(e,d,b) * G1(a,c,c,d);
+									term(e,3,a,b) += state(e,a,c) * G4(c,d,d,b);
+									term(e,1,a,b) += state(e,c,d) * G2(a,c,d,b);
+									term(e,2,a,b) += state(e,c,d) * G3(a,c,d,b);
+								}
 							}
 						}
 					}
 				}
 				"""
 		weave.inline(code,
-					['abs_state','coh_state','pop_state','term1_abs','term4_abs','term2_abs','term3_abs','term1_pop','term4_pop','term2_pop','term3_pop','term1_coh','term4_coh','term2_coh','term3_coh','G1','G2','G3','G4','dim'],
+					# ['abs_state','coh_state','pop_state','term1_abs','term4_abs','term2_abs','term3_abs','term1_pop','term4_pop','term2_pop','term3_pop','term1_coh','term4_coh','term2_coh','term3_coh','G1','G2','G3','G4','dim'],
+					['state','term','G1','G2','G3','G4','dim','num_rho'],
 					headers = ["<complex>","<iostream>"],
 					global_dict = dict(), 					
 					type_converters = scipy.weave.converters.blitz, 
 					compiler = Params.Compiler, extra_compile_args = Params.Flags,
 					verbose = 1)
 
-		myabs = term1_abs - term2_abs - term3_abs + term4_abs
-		mypop = term1_pop - term2_pop - term3_pop + term4_pop
-		mycoh = term1_coh - term2_coh - term3_coh + term4_coh
+		return term
+		# myabs = term[0,0] - term[0,1] - term[0,2] + term[0,3]
+		# mypop = term[1,0] - term[1,1] - term[1,2] + term[1,3]
+		# mycoh = term[2,0] - term[2,1] - term[2,2] + term[2,3]
 
-		return [myabs, mypop, mycoh]
+		# return [myabs, mypop, mycoh]
 
 	def TCL(self, OldState, t1):
 		t0 = self.timesofar
@@ -959,16 +1049,21 @@ class TightBindingTCL:
 	def Step(self,OldState,Time,Field = None, AdiabaticMultiplier = 1.0): 
 		NewState = OldState.clone()
 		NewState.Fill()
-		NewState["abs"] += np.dot(self.Hsys,OldState["abs"])
-		NewState["abs"] -= np.dot(OldState["abs"],self.Hsys)
-		NewState["pop"] += np.dot(self.Hsys,OldState["pop"])
-		NewState["pop"] -= np.dot(OldState["pop"],self.Hsys)
-		NewState["coh"] += np.dot(self.Hsys,OldState["coh"])
-		NewState["coh"] -= np.dot(OldState["coh"],self.Hsys)	
+		for ii in range(self.num_rho):
+			NewState["all_rho"][ii] += np.dot(self.Hsys,OldState["all_rho"][ii])
+			NewState["all_rho"][ii] -= np.dot(OldState["all_rho"][ii],self.Hsys)
+		# NewState["abs"] += np.dot(self.Hsys,OldState["abs"])
+		# NewState["abs"] -= np.dot(OldState["abs"],self.Hsys)
+		# NewState["pop"] += np.dot(self.Hsys,OldState["pop"])
+		# NewState["pop"] -= np.dot(OldState["pop"],self.Hsys)
+		# NewState["coh"] += np.dot(self.Hsys,OldState["coh"])
+		# NewState["coh"] -= np.dot(OldState["coh"],self.Hsys)	
 		NewState.MultiplyScalar(complex(0,-1.0))
 		TCLterms = self.TCL(OldState,Time)
-		NewState["abs"] -= TCLterms[0]
-		NewState["pop"] -= TCLterms[1] 
-		NewState["coh"] -= TCLterms[2]
+		# NewState["abs"] -= TCLterms[0]
+		# NewState["pop"] -= TCLterms[1] 
+		# NewState["coh"] -= TCLterms[2]
+		for ii in range(self.num_rho):
+			NewState["all_rho"][ii] -= (TCLterms[ii,0] - TCLterms[ii,1] - TCLterms[ii,2] + TCLterms[ii,3])
 		return NewState
 

@@ -44,9 +44,10 @@ class CalculationParameters:
 		self.const_reorg = False
 		siteE = []
 		self.populations = []
+		self.coherences = []
 		self.SD_range = 1800
 		self.SD_bot = 0
-		self.Duration = 1.5
+		self.Duration = 2.0
 		self.step_input = 0.00015
 		self.coh_type = 0
 		self.pop_type = 0
@@ -57,10 +58,36 @@ class CalculationParameters:
 		self.Temperature = 295.0
 		self.vibronic = []
 		self.vib_mult = 1
+		self.pop_index = 1000
+		self.coh_index = 1001
+		self.abs_index = 1002
+		self.do_coh = False
+		self.do_abs = False
+		self.do_pop = False
+		self.print_H = False
+		self.print_SD = False
+		self.print_IC = False
+		self.print_IC_index = 0
+		self.DirectionSpecific = True
 		myinput = open('TCL.input')
 		for line in myinput:
 			split_line = line.split()
 			# print split_line
+			if split_line[0] == 'elec_field_vector':
+				self.DirectionSpecific = False
+			if split_line[0] == 'print_H':
+				self.print_H = True
+			if split_line[0] == 'print_SD':
+				self.print_SD = True
+			if split_line[0] == 'print_IC':
+				self.print_IC = True
+				self.print_IC_index = int(split_line[1])
+			if split_line[0] == 'do_coh':
+				self.do_coh = True
+			if split_line[0] == 'do_abs':
+				self.do_abs = True
+			if split_line[0] == 'do_pop':
+				self.do_pop = True
 			if split_line[0] == 'ham' and split_line[1] == split_line[2]:
 				siteE.append(float(split_line[3]))
 			if split_line[0] == 'name':
@@ -156,6 +183,9 @@ class CalculationParameters:
 				for ii in range(self.dim-1):
 					self.const_reorg_vals[ii] = float(split_line[ii+2])
 		
+		if not self.do_abs:
+			self.DirectionSpecific = False
+
 		if self.SD_bot >= self.SD_range:
 			print "ERROR: sd_top must be greater than sd_bot. Exiting..."
 			print huh
@@ -164,8 +194,8 @@ class CalculationParameters:
 			print 'ERROR: Number of system sites not set correctly! Check the energies entry in the input! Exiting...'
 			print huh
 
-		self.globalscale = 0#min(siteE)-1000
-		self.upperlimit = max(siteE)+10000
+		self.globalscale = 0#min(siteE)-2500
+		self.upperlimit = max(siteE)+2000
 		for ii in range(len(self.vibronic)/2):
 			self.upperlimit += self.vibronic[ii*2] * self.vibronic[ii*2+1]
 		self.nocc = 4
@@ -251,8 +281,7 @@ class CalculationParameters:
 		self.FiniteDifferenceBosons = False
 
 		self.DipoleGuess = True # if False, a superposition of bright states will be used. 
-		self.AllDirections = False # Will initalize three concurrent propagations. 
-		self.DirectionSpecific = False		
+		self.AllDirections = False # Will initalize three concurrent propagations. 		
 		
 		self.InitialDirection = -1 # 0 = x etc. Only excites in the x direction -1=isotropic
 		self.BeginWithStatesOfEnergy = None 

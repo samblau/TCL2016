@@ -16,9 +16,37 @@ from NumGrad import *
 from TensorNumerics import *
 
 EvPerAu = 27.2113
+
+def FFT2016(Input,dx,N):
+	import numpy as np
+	import matplotlib.pyplot as plt
+
+	# N = 2**12
+	# x = np.linspace(0,50,(2*N))
+	# print x.size
+	# y = np.exp(-x*x/.25)
+	# plt.plot(x,y)
+	# plt.show()
+
+	y_hat = np.fft.fft(Input)
+
+	# dx = x[1]-x[0]
+	# print dx
+	# freq = np.fft.fftfreq(x.size, d=dx)
+	freq = np.fft.fftfreq(N, d=dx)
+
+	y_hat_shifted = np.fft.fftshift(y_hat)
+	freq_shifted = np.fft.fftshift(freq)
+
+	plt.plot(freq,y_hat*np.conj(y_hat))
+	plt.show()
+	plt.plot(freq_shifted, y_hat_shifted*np.conj(y_hat_shifted))
+	# plt.xlim([-4.0, 4.0])
+	plt.show()
 	   
 def	GeneralizedFFT(Input,b=1.0,a=0.0): 
 	dim = len(Input)
+	print 'numpy.shape(Input) = ',numpy.shape(Input)
 	t1 = numpy.fromfunction(lambda X,Y: 2.0*pi*complex(0.0,1.0)*b*(X-1.0)*(Y-1.0)/dim,shape=[dim,dim])
 	t1 = numpy.exp(t1)
 	return (pow(dim,-(1.0-a)/2.0)*numpy.tensordot(Input,t1,axes=([0],[0])))
@@ -63,48 +91,112 @@ def LocalMaxima(AList, Tol = 0.2 ,NMax=10):
 	return list(set(tuple(map(lambda X: round(X,3),tore))))
 
 def SpectralAnalysis(Arg_Data,Arg_SampleInterval,DesiredZoom = 1.0/30.0,Title = "Spec",DesiredMaximum=None,Smoothing = False): #add logic here to take into account the density of states from imaginary time propagation
-	Data = Arg_Data.copy()	
-	# By default, remove all the zero frequency information. 
-	Arg_Data -= Arg_Data.mean()
-	DataPts = len(Data)
-	SampleInterval = Arg_SampleInterval
-	if (pow(DataPts,2.0) > 1*1024*1024): 
-		if Params.Parallel == False:
-			print "Spectral analysis of very large dataset, downsampling"
-		#KeepEvery = int(sqrt(pow(DataPts,2.0)/pow(3000,2.)))
-		KeepEvery = max(int(sqrt(pow(DataPts,2.0)/pow(6000,2.))),1)
-		if Params.Parallel == False:
-			print " by factor of ", KeepEvery
-		SampleInterval = Arg_SampleInterval*KeepEvery
-		Data = Arg_Data[0::KeepEvery].copy()
-		DataPts = len(Data) 
+	if len(numpy.shape(Arg_Data))==1:
+		Data = Arg_Data.copy()	
+		# By default, remove all the zero frequency information. 
+		Arg_Data -= Arg_Data.mean()
+		DataPts = len(Data)
+		SampleInterval = Arg_SampleInterval
+		if (pow(DataPts,2.0) > 1*1024*1024): 
+			if Params.Parallel == False:
+				print "Spectral analysis of very large dataset, downsampling"
+			#KeepEvery = int(sqrt(pow(DataPts,2.0)/pow(3000,2.)))
+			KeepEvery = max(int(sqrt(pow(DataPts,2.0)/pow(6000,2.))),1)
+			if Params.Parallel == False:
+				print " by factor of ", KeepEvery
+			SampleInterval = Arg_SampleInterval*KeepEvery
+			Data = Arg_Data[0::KeepEvery].copy()
+			DataPts = len(Data) 
 
-	AuPerWavenumber = 4.5563e-6
+		AuPerWavenumber = 4.5563e-6
 
-	Zoom = DesiredZoom
-	if (DesiredMaximum != None): 
-		Zoom = SampleInterval*DesiredMaximum*(1.0/pi)
+		Zoom = DesiredZoom
+		if (DesiredMaximum != None): 
+			Zoom = SampleInterval*DesiredMaximum*(1.0/pi)
+			if Params.Parallel == False:
+				print "Assigning Zoom", Zoom		
+
+		Freqs = pi*(2.0/SampleInterval)*Zoom*(numpy.arange(DataPts/2.0))/(DataPts)		
+	#	Freqs = pi*(1.0/SampleInterval)*Zoom*(numpy.arange(DataPts/2.0))/(DataPts)
+		CplxStrengths = GeneralizedFFT(Data,-1.0*Zoom)
+		print 'np.shape(CplxStrengths) = ',numpy.shape(CplxStrengths)
+		print CplxStrengths
 		if Params.Parallel == False:
-			print "Assigning Zoom", Zoom		
+			print "Generalized FFT result: ", numpy.sum(CplxStrengths*CplxStrengths.conj())
+		
+		MakeSimplePlot(CplxStrengths.real[0:3000],tit=Title+"RealStrengths")
+		MakeSimplePlot(CplxStrengths.imag[0:3000],tit=Title+"ImStrengths")
+		CplxStrengths = CplxStrengths[:len(Freqs)] # I bet the problem is the negative frequencies... 
+		# import scipy.special
+		# Damp out the low frequency information. 
+	#	DampLow= numpy.vectorize(lambda X: scipy.special.erf(X/int(0.07*len(CplxStrengths))))
+	#	Damping = DampLow(numpy.arange(len(CplxStrengths)))
+	#	CplxStrengths = CplxStrengths*Damping
+		
+		numpy.savetxt('./Output'+Params.SystemName+ Params.start_time+'/FFTStrengths',CplxStrengths,fmt='%.18e')	
+		# Strengths = CplxStrengths.real
+		# Strengths = CplxStrengths.imag
+		# Strengths = CplxStrengths.real**2+CplxStrengths.imag**2
+		Strengths = CplxStrengths*CplxStrengths.conj()
+	else:
+		print 'numpy.shape(Arg_Data) = ',numpy.shape(Arg_Data)
+		orig_data = Arg_Data
+		total_strengths = numpy.zeros(len(Arg_Data[:,0]),dtype=complex)
+		for ii in range(3):
+			Arg_Data = orig_data[:,ii]
+			print 'new numpy.shape(Arg_Data) = ',numpy.shape(Arg_Data)
+			Data = Arg_Data.copy()	
+			# By default, remove all the zero frequency information. 
+			Arg_Data -= Arg_Data.mean()
+			DataPts = len(Data)
+			SampleInterval = Arg_SampleInterval
+			if (pow(DataPts,2.0) > 1*1024*1024): 
+				if Params.Parallel == False:
+					print "Spectral analysis of very large dataset, downsampling"
+				#KeepEvery = int(sqrt(pow(DataPts,2.0)/pow(3000,2.)))
+				KeepEvery = max(int(sqrt(pow(DataPts,2.0)/pow(6000,2.))),1)
+				if Params.Parallel == False:
+					print " by factor of ", KeepEvery
+				SampleInterval = Arg_SampleInterval*KeepEvery
+				Data = Arg_Data[0::KeepEvery].copy()
+				DataPts = len(Data) 
 
-	Freqs = pi*(2.0/SampleInterval)*Zoom*(numpy.arange(DataPts/2.0))/(DataPts)		
-#	Freqs = pi*(1.0/SampleInterval)*Zoom*(numpy.arange(DataPts/2.0))/(DataPts)
-	CplxStrengths = GeneralizedFFT(Data,-1.0*Zoom)
-	if Params.Parallel == False:
-		print "Generalized FFT result: ", numpy.sum(CplxStrengths*CplxStrengths.conj())
-	
-	MakeSimplePlot(CplxStrengths.real[0:3000],tit=Title+"RealStrengths")
-	MakeSimplePlot(CplxStrengths.imag[0:3000],tit=Title+"ImStrengths")
-	CplxStrengths = CplxStrengths[:len(Freqs)] # I bet the problem is the negative frequencies... 
-	import scipy.special
-	# Damp out the low frequency information. 
-#	DampLow= numpy.vectorize(lambda X: scipy.special.erf(X/int(0.07*len(CplxStrengths))))
-#	Damping = DampLow(numpy.arange(len(CplxStrengths)))
-#	CplxStrengths = CplxStrengths*Damping
-	
-	numpy.savetxt('./Output'+Params.SystemName+ Params.start_time+'/FFTStrengths',CplxStrengths,fmt='%.18e')	
-	# Strengths = CplxStrengths.real
-	Strengths = CplxStrengths.imag
+			AuPerWavenumber = 4.5563e-6
+
+			Zoom = DesiredZoom
+			if (DesiredMaximum != None): 
+				Zoom = SampleInterval*DesiredMaximum*(1.0/pi)
+				if Params.Parallel == False:
+					print "Assigning Zoom", Zoom		
+
+			Freqs = pi*(2.0/SampleInterval)*Zoom*(numpy.arange(DataPts/2.0))/(DataPts)		
+		#	Freqs = pi*(1.0/SampleInterval)*Zoom*(numpy.arange(DataPts/2.0))/(DataPts)
+			CplxStrengths = GeneralizedFFT(Data,-1.0*Zoom)
+			print 'np.shape(CplxStrengths) = ',numpy.shape(CplxStrengths)
+			print CplxStrengths
+			if Params.Parallel == False:
+				print "Generalized FFT result: ", numpy.sum(CplxStrengths*CplxStrengths.conj())
+			
+			MakeSimplePlot(CplxStrengths.real[0:3000],tit=Title+"RealStrengths")
+			MakeSimplePlot(CplxStrengths.imag[0:3000],tit=Title+"ImStrengths")
+			CplxStrengths = CplxStrengths[:len(Freqs)] # I bet the problem is the negative frequencies... 
+			total_strengths = total_strengths[:len(Freqs)]
+			# import scipy.special
+			# Damp out the low frequency information. 
+		#	DampLow= numpy.vectorize(lambda X: scipy.special.erf(X/int(0.07*len(CplxStrengths))))
+		#	Damping = DampLow(numpy.arange(len(CplxStrengths)))
+		#	CplxStrengths = CplxStrengths*Damping
+			
+			numpy.savetxt('./Output'+Params.SystemName+ Params.start_time+'/FFTStrengths',CplxStrengths,fmt='%.18e')	
+			# Strengths = CplxStrengths.real
+			# Strengths = CplxStrengths.imag
+			# Strengths = CplxStrengths.real**2+CplxStrengths.imag**2
+			print 'numpy.shape(CplxStrengths) = ',numpy.shape(CplxStrengths)
+			Strengths = CplxStrengths*CplxStrengths.conj()
+			print 'numpy.shape(Strengths) = ',numpy.shape(Strengths)
+			print 'numpy.shape(total_strengths) = ',numpy.shape(total_strengths)
+			total_strengths += Strengths
+	total_strengths /= 3.0
 
 	import matplotlib
 	import matplotlib.pyplot as plt
@@ -119,7 +211,7 @@ def SpectralAnalysis(Arg_Data,Arg_SampleInterval,DesiredZoom = 1.0/30.0,Title = 
 	ax = fig.add_subplot(111)	
 	Freqs = Params.globalscale + Freqs/AuPerWavenumber
 	numpy.savetxt('./Output'+Params.SystemName+ Params.start_time+'/Freqs',Freqs,fmt='%.18e')
-	Strengths = Strengths#/AuPerWavenumber
+	# Strengths = Strengths#/AuPerWavenumber
 	l1 = plt.plot( Freqs , Strengths,'k')
 
 	plt.setp(l1,linewidth=2, color='r')

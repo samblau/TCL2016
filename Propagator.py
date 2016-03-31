@@ -47,6 +47,7 @@ class Propagator:
 		GoodMkdir("./Output"+Params.SystemName+ Params.start_time)		
 		
 	def Propagate(self): 
+		print "Do I ever really get here?"
 		Step=0
 		while (self.TNow < Params.TMax): 
 			# returns an estimate of the energy. 

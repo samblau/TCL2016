@@ -71,20 +71,23 @@ class Propagator_TD(Propagator):
 
 		if Params.save_dens:
 			# f = open('./Output'+Params.SystemName+ Params.start_time+'/pop_mat','w')
-			# f.write(str(self.VNow["pop"]) + '\n' + '\n')
+			# f.write(str(self.VNow["all_rho"][Params.pop_index]) + '\n' + '\n')
 			# f.close()
 			# f = open('./Output'+Params.SystemName+ Params.start_time+'/coh_mat','w')
-			# f.write(str(self.VNow["coh"]) + '\n' + '\n')
+			# f.write(str(self.VNow["all_rho"][Params.coh_index]) + '\n' + '\n')
 			# f.close()
 			# f = open('./Output'+Params.SystemName+ Params.start_time+'/abs_mat','w')
-			# f.write(str(self.VNow["abs"]) + '\n' + '\n')
+			# f.write(str(self.VNow["all_rho"][Params.abs_index]) + '\n' + '\n')
 			# f.close()
-			mypop = []
-			mypop.append(self.VNow["pop"])
-			mycoh = []
-			mycoh.append(self.VNow["coh"])
-			myabs = []
-			myabs.append(self.VNow["abs"])
+			if Params.do_pop:
+				mypop = []
+				mypop.append(self.VNow["all_rho"][Params.pop_index])
+			if Params.do_coh:
+				mycoh = []
+				mycoh.append(self.VNow["all_rho"][Params.coh_index])
+			if Params.do_abs:
+				myabs = []
+				myabs.append(self.VNow["all_rho"][Params.abs_index])
 
 
 
@@ -113,17 +116,20 @@ class Propagator_TD(Propagator):
 			self.RungeKuttaStep(self.VNow,self.TNow)
 
 			if Params.save_dens:
-				mypop.append(self.VNow["pop"])
-				mycoh.append(self.VNow["coh"])
-				myabs.append(self.VNow["abs"])
+				if Params.do_pop:
+					mypop.append(self.VNow["all_rho"][Params.pop_index])
+				if Params.do_coh:
+					mycoh.append(self.VNow["all_rho"][Params.coh_index])
+				if Params.do_abs:
+					myabs.append(self.VNow["all_rho"][Params.abs_index])
 			# 	f = open('./Output'+Params.SystemName+ Params.start_time+'/pop_mat','a')
-			# 	f.write(str(self.VNow["pop"]) + '\n' + '\n')
+			# 	f.write(str(self.VNow["all_rho"][Params.pop_index]) + '\n' + '\n')
 			# 	f.close()
 			# 	f = open('./Output'+Params.SystemName+ Params.start_time+'/coh_mat','a')
-			# 	f.write(str(self.VNow["coh"]) + '\n' + '\n')
+			# 	f.write(str(self.VNow["all_rho"][Params.coh_index]) + '\n' + '\n')
 			# 	f.close()
 			# 	f = open('./Output'+Params.SystemName+ Params.start_time+'/abs_mat','a')
-			# 	f.write(str(self.VNow["abs"]) + '\n' + '\n')
+			# 	f.write(str(self.VNow["all_rho"][Params.abs_index]) + '\n' + '\n')
 			# 	f.close()
 
 			self.MarkovianRec[Step] = copy.deepcopy(Params.MarkovianRecord)
@@ -139,26 +145,35 @@ class Propagator_TD(Propagator):
 			# 	plt.clf()
 
 			# if Params.pop:
-			# 	popVNow = np.dot(np.dot(Params.evecs,self.VNow["coh"]),Params.invevecs)
-			popVNow = np.dot(np.dot(Params.evecs,self.VNow["pop"]),Params.invevecs)
+			# 	popVNow = np.dot(np.dot(Params.evecs,self.VNow["all_rho"][Params.coh_index]),Params.invevecs)
+			if Params.do_pop:
+				popVNow = np.dot(np.dot(Params.evecs,self.VNow["all_rho"][Params.pop_index]),Params.invevecs)
 
 			self.TimesEvaluated.append(self.TNow*Params.time_constant)
 			# if (self.Field == None): 
 			# 	# Only collect dipoles for fourier transform if the field is off. 
 			# 	self.Dipoles[Step] = numpy.real(self.ShortTimePropagator.DipoleMoment(self.VNow,self.TNow))		
 			
-			self.Dipoles[Step] = numpy.real(self.ShortTimePropagator.DipoleMoment(self.VNow,self.TNow))
-			if Params.coh_type == 1:
-				self.Coherences[Step] = numpy.real(self.VNow["coh"][Params.coherences[0],Params.coherences[1]])
-			if Params.coh_type == 0:
-				self.Coherences[Step] = numpy.real(np.dot(np.dot(Params.evecs,self.VNow["coh"]),Params.invevecs)[Params.coherences[0],Params.coherences[1]])
-			self.Norms[Step] = np.sum(np.diag(np.real(self.VNow["coh"]))) + np.sum(np.diag(np.real(self.VNow["pop"])))
+			if Params.do_abs:
+				self.Dipoles[Step] = numpy.real(self.ShortTimePropagator.DipoleMoment(self.VNow,self.TNow))
+			if Params.do_coh:
+				if Params.coh_type == 1:
+					self.Coherences[Step] = numpy.real(self.VNow["all_rho"][Params.coh_index][Params.coherences[0],Params.coherences[1]])
+				if Params.coh_type == 0:
+					self.Coherences[Step] = numpy.real(np.dot(np.dot(Params.evecs,self.VNow["all_rho"][Params.coh_index]),Params.invevecs)[Params.coherences[0],Params.coherences[1]])
+			if Params.do_coh and Params.do_pop:
+				self.Norms[Step] = np.sum(np.diag(np.real(self.VNow["all_rho"][Params.coh_index]))) + np.sum(np.diag(np.real(self.VNow["all_rho"][Params.pop_index])))
+			elif Params.do_coh:
+				self.Norms[Step] = np.sum(np.diag(np.real(self.VNow["all_rho"][Params.coh_index])))
+			elif Params.do_pop:
+				self.Norms[Step] = np.sum(np.diag(np.real(self.VNow["all_rho"][Params.pop_index])))
 
-			for ii in range(Params.dim-1):
-				self.Populations[Step,ii] = numpy.real(popVNow[ii+1,ii+1])
-				# else:
-				# 	# self.Populations[Step,ii] = numpy.real(self.VNow["coh"][ii+1,ii+1])
-				# 	self.Populations[Step,ii] = self.VNow["coh"][ii+1,ii+1]
+			if Params.do_pop:
+				for ii in range(Params.dim-1):
+					self.Populations[Step,ii] = numpy.real(popVNow[ii+1,ii+1])
+					# else:
+					# 	# self.Populations[Step,ii] = numpy.real(self.VNow["all_rho"][Params.coh_index][ii+1,ii+1])
+					# 	self.Populations[Step,ii] = self.VNow["all_rho"][Params.coh_index][ii+1,ii+1]
 
 
 			if Params.Parallel == False:
@@ -167,10 +182,17 @@ class Propagator_TD(Propagator):
 			if Params.Parallel == False:
 				#print abs(self.Populations[Step,:])
 				# print self.Norms[Step]
-				myprint = "T: " + str(self.TNow*Params.time_constant) + " ps  Mu: " + str(round(self.Dipoles[Step],4))
-				for ii in range(Params.dim-1):
-					myprint += "  |P" + str(ii+1) + "| " + str(round(self.Populations[Step,ii],4))
-				myprint += "  Total " + str(round(np.sum(self.Populations[Step,:]),4)) + "  WallMinToGo: " + str(round(((Params.TMax-self.TNow)/Params.TStep)*(TimingEnd-TimingStart)/60.0))
+				myprint = "T: " + str(self.TNow*Params.time_constant) + " ps"
+				if Params.do_abs:
+					if not Params.DirectionSpecific:
+						myprint += "  Mu: " + str(round(self.Dipoles[Step],4))
+					elif Params.DirectionSpecific:
+						myprint += '  Mu: ' + str(round(self.Dipoles[Step,0],4)) + ' ' + str(round(self.Dipoles[Step,1],4)) + ' ' + str(round(self.Dipoles[Step,2],4))
+				if Params.do_pop:
+					for ii in range(Params.dim-1):
+						myprint += "  |P" + str(ii+1) + "| " + str(round(self.Populations[Step,ii],4))
+					myprint += "  Total " + str(round(np.sum(self.Populations[Step,:]),4))
+				myprint +=  "  WallMinToGo: " + str(round(((Params.TMax-self.TNow)/Params.TStep)*(TimingEnd-TimingStart)/60.0))
 				print myprint
 				# print "T: ", self.TNow, " Mu : ", round(self.Dipoles[Step],4), " |P1| ", round(self.Populations[Step,0],4), " |P2| ", round(self.Populations[Step,1],4), " |P3| ", round(self.Populations[Step,2],4), " |P4| ", round(self.Populations[Step,3],4), " |P5| ", round(self.Populations[Step,4],4), " |P6| ", round(self.Populations[Step,5],4), " |P7| ", round(self.Populations[Step,6],4), " Total ", round(np.sum(self.Populations[Step,:]),4), " WallMinToGo: ", round(((Params.TMax-self.TNow)/Params.TStep)*(TimingEnd-TimingStart)/60.0)
 				#print "T: ", self.TNow, " Mu : ", round(self.Dipoles[Step],4), " |St|: ", self.Norms[Step], " WallMinToGo: ", round(((Params.TMax-self.TNow)/Params.TStep)*(TimingEnd-TimingStart)/60.0)
@@ -186,54 +208,57 @@ class Propagator_TD(Propagator):
 		print "Propagation " + str(self.proc_index) + " Complete... Collecting Data. "
 
 		if Params.save_dens:
-			f = open('./Output'+Params.SystemName+ Params.start_time+'/pop_mat','w')
-			f.write(str(mypop))
-			f.close()
-			f = open('./Output'+Params.SystemName+ Params.start_time+'/coh_mat','w')
-			f.write(str(mycoh))
-			f.close()
-			f = open('./Output'+Params.SystemName+ Params.start_time+'/abs_mat','w')
-			f.write(str(myabs))
-			f.close()
+			if Params.do_pop:
+				f = open('./Output'+Params.SystemName+ Params.start_time+'/pop_mat','w')
+				f.write(str(mypop))
+				f.close()
+			if Params.do_coh:
+				f = open('./Output'+Params.SystemName+ Params.start_time+'/coh_mat','w')
+				f.write(str(mycoh))
+				f.close()
+			if Params.do_abs:
+				f = open('./Output'+Params.SystemName+ Params.start_time+'/abs_mat','w')
+				f.write(str(myabs))
+				f.close()
 
-		if Params.equil == True:
-			#print self.VNow["pop"]
-			#os.mkdir('equil_mats')
-			f = open('./equil_mats/pop_mat_real','w')
-			for ii in range(8):
-				for jj in range(8):
-					f.write(str(numpy.real(self.VNow["pop"][ii][jj])) + '\n')
-			f.close()
+		# if Params.equil == True:
+		# 	#print self.VNow["all_rho"][Params.pop_index]
+		# 	#os.mkdir('equil_mats')
+		# 	f = open('./equil_mats/pop_mat_real','w')
+		# 	for ii in range(8):
+		# 		for jj in range(8):
+		# 			f.write(str(numpy.real(self.VNow["all_rho"][Params.pop_index][ii][jj])) + '\n')
+		# 	f.close()
 
-			f = open('./equil_mats/pop_mat_imag','w')
-			for ii in range(8):
-				for jj in range(8):
-					f.write(str(numpy.imag(self.VNow["pop"][ii][jj])) + '\n')
-			f.close()
+		# 	f = open('./equil_mats/pop_mat_imag','w')
+		# 	for ii in range(8):
+		# 		for jj in range(8):
+		# 			f.write(str(numpy.imag(self.VNow["all_rho"][Params.pop_index][ii][jj])) + '\n')
+		# 	f.close()
 
-			f = open('./equil_mats/coh_mat_real','w')
-			for ii in range(8):
-				for jj in range(8):
-					f.write(str(numpy.real(self.VNow["coh"][ii][jj])) + '\n')
-			f.close()
+		# 	f = open('./equil_mats/coh_mat_real','w')
+		# 	for ii in range(8):
+		# 		for jj in range(8):
+		# 			f.write(str(numpy.real(self.VNow["all_rho"][Params.coh_index][ii][jj])) + '\n')
+		# 	f.close()
 
-			f = open('./equil_mats/coh_mat_imag','w')
-			for ii in range(8):
-				for jj in range(8):
-					f.write(str(numpy.imag(self.VNow["coh"][ii][jj])) + '\n')
-			f.close()
+		# 	f = open('./equil_mats/coh_mat_imag','w')
+		# 	for ii in range(8):
+		# 		for jj in range(8):
+		# 			f.write(str(numpy.imag(self.VNow["all_rho"][Params.coh_index][ii][jj])) + '\n')
+		# 	f.close()
 
-			f = open('./equil_mats/abs_mat_real','w')
-			for ii in range(8):
-				for jj in range(8):
-					f.write(str(numpy.real(self.VNow["abs"][ii][jj])) + '\n')
-			f.close()
+		# 	f = open('./equil_mats/abs_mat_real','w')
+		# 	for ii in range(8):
+		# 		for jj in range(8):
+		# 			f.write(str(numpy.real(self.VNow["all_rho"][Params.abs_index][ii][jj])) + '\n')
+		# 	f.close()
 
-			f = open('./equil_mats/abs_mat_imag','w')
-			for ii in range(8):
-				for jj in range(8):
-					f.write(str(numpy.imag(self.VNow["abs"][ii][jj])) + '\n')
-			f.close()
+		# 	f = open('./equil_mats/abs_mat_imag','w')
+		# 	for ii in range(8):
+		# 		for jj in range(8):
+		# 			f.write(str(numpy.imag(self.VNow["all_rho"][Params.abs_index][ii][jj])) + '\n')
+		# 	f.close()
 
 		end = time.time()
 
@@ -248,48 +273,25 @@ class Propagator_TD(Propagator):
 		import matplotlib.pylab as lab
 
 
+		# colors = ['blue','green','magenta','orange','darkturquoise','yellowgreen','dodgerblue','darkolivegreen']
 		colors = ['blue','green','red','magenta','saddlebrown','orange','darkturquoise','yellowgreen','dodgerblue','darkolivegreen']
 		styles = ['solid','dashed','dashdot','dotted','dashed','dashdot','dotted','dashed','dashdot','dotted']
 		# print self.Populations[:,3]
-		self.Populations.resize(len(self.TimesEvaluated),Params.dim-1)
-		fig = plt.figure()
-		#plt.plot(self.TimesEvaluated,self.Populations[:,3])
-		fig.hold()
-		if Params.vib_mult == 1:
-			for ii in range(Params.dim-1):
-				plt.plot(self.TimesEvaluated,self.Populations[:,ii],c=colors[ii],linewidth=2)
-		else:
-			for ii in range(Params.orig_dim-1):
-				for jj in range(Params.vib_mult):
-					plt.plot(self.TimesEvaluated,self.Populations[:,ii*Params.vib_mult+jj],c=colors[ii],ls=styles[jj],linewidth=2)
-		#plt.ylim(0,1)
-		myleg = []
-		for ii in range(Params.dim-1):
-			myleg = np.concatenate((myleg,[str(ii+1)]))
-		plt.legend(myleg)
-		# plt.legend(['DBVc','DBVd','MBVa','MBVb','PCBc158','PCBd158','PCBc82','PCBd82']) # MAKE PRETTY PLOTS HERE
-
-		plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
-		plt.ylabel('Site Populations',fontsize = Params.LabelFontSize)
-		plt.xlim(0,(Params.TMax+1)*Params.time_constant)
-		plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Populations')
-		plt.clf()
-
-		if Params.vib_mult != 1:
-			orig_pops = np.zeros(shape=(len(self.TimesEvaluated),Params.orig_dim-1))
-			for ii in range(len(self.TimesEvaluated)):
-				for jj in range(Params.orig_dim-1):
-					for kk in range(Params.vib_mult):
-						orig_pops[ii][jj] += self.Populations[ii][jj*Params.vib_mult+kk]
-
+		if Params.do_pop:
+			self.Populations.resize(len(self.TimesEvaluated),Params.dim-1)
 			fig = plt.figure()
 			#plt.plot(self.TimesEvaluated,self.Populations[:,3])
 			fig.hold()
-			for ii in range(0,Params.orig_dim-1):
-				plt.plot(self.TimesEvaluated,orig_pops[:,ii],c=colors[ii],linewidth=2)
+			if Params.vib_mult == 1:
+				for ii in range(Params.dim-1):
+					plt.plot(self.TimesEvaluated,self.Populations[:,ii],c=colors[ii],linewidth=2)
+			else:
+				for ii in range(Params.orig_dim-1):
+					for jj in range(Params.vib_mult):
+						plt.plot(self.TimesEvaluated,self.Populations[:,ii*Params.vib_mult+jj],c=colors[ii],ls=styles[jj],linewidth=2)
 			#plt.ylim(0,1)
 			myleg = []
-			for ii in range(Params.orig_dim-1):
+			for ii in range(Params.dim-1):
 				myleg = np.concatenate((myleg,[str(ii+1)]))
 			plt.legend(myleg)
 			# plt.legend(['DBVc','DBVd','MBVa','MBVb','PCBc158','PCBd158','PCBc82','PCBd82']) # MAKE PRETTY PLOTS HERE
@@ -297,8 +299,33 @@ class Propagator_TD(Propagator):
 			plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
 			plt.ylabel('Site Populations',fontsize = Params.LabelFontSize)
 			plt.xlim(0,(Params.TMax+1)*Params.time_constant)
-			plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Populations_orig')
+			plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Populations')
 			plt.clf()
+
+			if Params.vib_mult != 1:
+				orig_pops = np.zeros(shape=(len(self.TimesEvaluated),Params.orig_dim-1))
+				for ii in range(len(self.TimesEvaluated)):
+					for jj in range(Params.orig_dim-1):
+						for kk in range(Params.vib_mult):
+							orig_pops[ii][jj] += self.Populations[ii][jj*Params.vib_mult+kk]
+
+				fig = plt.figure()
+				#plt.plot(self.TimesEvaluated,self.Populations[:,3])
+				fig.hold()
+				for ii in range(0,Params.orig_dim-1):
+					plt.plot(self.TimesEvaluated,orig_pops[:,ii],c=colors[ii],linewidth=2)
+				#plt.ylim(0,1)
+				myleg = []
+				for ii in range(Params.orig_dim-1):
+					myleg = np.concatenate((myleg,[str(ii+1)]))
+				plt.legend(myleg)
+				# plt.legend(['DBVc','DBVd','MBVa','MBVb','PCBc158','PCBd158','PCBc82','PCBd82']) # MAKE PRETTY PLOTS HERE
+
+				plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
+				plt.ylabel('Site Populations',fontsize = Params.LabelFontSize)
+				plt.xlim(0,(Params.TMax+1)*Params.time_constant)
+				plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Populations_orig')
+				plt.clf()
 
 		self.MarkovianRec.resize(len(self.TimesEvaluated),Params.dim-1)
 		fig = plt.figure()
@@ -308,6 +335,9 @@ class Propagator_TD(Propagator):
 			plt.plot(self.TimesEvaluated,self.MarkovianRec[:,ii],linewidth=2)
 		#plt.ylim(0,1)
 		# plt.legend(['1','2','3','4','5','6','7'])
+		myleg = []
+		for ii in range(Params.orig_dim-1):
+			myleg = np.concatenate((myleg,[str(ii+1)]))
 		plt.legend(myleg)
 		# plt.legend(['DBVc','DBVd','MBVa','MBVb','PCBc158','PCBd158','PCBc82','PCBd82'])
 
@@ -373,48 +403,62 @@ class Propagator_TD(Propagator):
 			#import matplotlib.pyplot as plt
 			import matplotlib.font_manager as fnt
 			# Make plot styles visible. 
-			PlotFont = {'fontname':'Helvetica','fontsize':18,'weight':'bold'}
-			LegendFont = fnt.FontProperties(family='Helvetica',size='17',weight='bold')	
-			l1 = plt.plot(self.TimesEvaluated,self.Norms,'k--')
-			plt.setp(l1,linewidth=2, color='r')
-			plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
-			plt.ylabel('|State|',fontsize = Params.LabelFontSize)
-			plt.xlim(0,(Params.TMax+1)*Params.time_constant)
-			plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'NormOfState')
-			plt.clf()
-
-			l1 = plt.plot(self.TimesEvaluated,self.Coherences,'k--')
-			plt.setp(l1,linewidth=2, color='r')
-			plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
-			plt.ylabel('Coherence',fontsize = Params.LabelFontSize)
-			plt.xlim(0,(Params.TMax+1)*Params.time_constant)
-			plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Coherences')
-			plt.clf()
-
-			if (Params.DirectionSpecific):
-				lx,ly,lz = plt.plot(self.TimesEvaluated,self.Dipoles[:,0],'k',self.TimesEvaluated,self.Dipoles[:,1],'k--',self.TimesEvaluated,self.Dipoles[:,2],'k.')
-				plt.setp(lx,linewidth=2, color='r')
-				plt.setp(ly,linewidth=2, color='g')
-				plt.setp(lz,linewidth=2, color='b')
-				plt.legend(['x','y','z'],loc=2)
-				plt.xlabel('Time (ps)',fontsize = Params.LabelFontSize)
-				plt.ylabel('Mu (au)',fontsize = Params.LabelFontSize)
-				plt.xlim(0,(Params.TMax+1)*Params.time_constant)
-				plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Dipole')
-				plt.clf()
-				Nrm = lambda X: (X[0]*X[0]+X[1]*X[1]+X[2]*X[2])
-				DipoleStrength = map(Nrm,self.Dipoles)				
-				SpectralAnalysis(numpy.array(DipoleStrength), Params.TStep, DesiredMaximum = 26.0/EvPerAu,Smoothing = True)
-			else : 
-				l1 = plt.plot(self.TimesEvaluated,self.Dipoles,'k--')
+			if Params.do_pop or Params.do_coh:
+				PlotFont = {'fontname':'Helvetica','fontsize':18,'weight':'bold'}
+				LegendFont = fnt.FontProperties(family='Helvetica',size='17',weight='bold')	
+				l1 = plt.plot(self.TimesEvaluated,self.Norms,'k--')
 				plt.setp(l1,linewidth=2, color='r')
 				plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
-				plt.ylabel('|Mu|',fontsize = Params.LabelFontSize)
+				plt.ylabel('|State|',fontsize = Params.LabelFontSize)
 				plt.xlim(0,(Params.TMax+1)*Params.time_constant)
-				plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Dipole')
+				plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'NormOfState')
 				plt.clf()
-				print "Proc " + str(self.proc_index) + " building spectra"
-				SpectralAnalysis(self.Dipoles, Params.TStep, DesiredMaximum = 4.0/EvPerAu,Smoothing = True)
+
+			if Params.do_coh:
+				l1 = plt.plot(self.TimesEvaluated,self.Coherences,'k--')
+				plt.setp(l1,linewidth=2, color='r')
+				plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
+				plt.ylabel('Coherence',fontsize = Params.LabelFontSize)
+				plt.xlim(0,(Params.TMax+1)*Params.time_constant)
+				plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Coherences')
+				plt.clf()
+
+			if Params.do_abs:
+				if (Params.DirectionSpecific):
+					lx,ly,lz = plt.plot(self.TimesEvaluated,self.Dipoles[:,0],'k',self.TimesEvaluated,self.Dipoles[:,1],'k--',self.TimesEvaluated,self.Dipoles[:,2],'k.')
+					plt.setp(lx,linewidth=2, color='r')
+					plt.setp(ly,linewidth=2, color='g')
+					plt.setp(lz,linewidth=2, color='b')
+					plt.legend(['x','y','z'],loc=2)
+					plt.xlabel('Time (ps)',fontsize = Params.LabelFontSize)
+					plt.ylabel('Mu (au)',fontsize = Params.LabelFontSize)
+					plt.xlim(0,(Params.TMax+1)*Params.time_constant)
+					plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Dipole')
+					plt.clf()
+					# print 'np.shape(self.Dipoles) = ',np.shape(self.Dipoles)
+					# SpectralAnalysis(self.Dipoles[:,0], Params.TStep, Title='SpecX',DesiredMaximum = 4.0/EvPerAu,Smoothing = True)
+					# SpectralAnalysis(self.Dipoles[:,1], Params.TStep, Title='SpecY',DesiredMaximum = 4.0/EvPerAu,Smoothing = True)
+					# SpectralAnalysis(self.Dipoles[:,2], Params.TStep, Title='SpecZ',DesiredMaximum = 4.0/EvPerAu,Smoothing = True)
+					# Nrm = lambda X: (X[0]*X[0]+X[1]*X[1]+X[2]*X[2])
+					# DipoleStrength = map(Nrm,self.Dipoles)			
+					# DipoleStrength=np.zeros(len(self.TimesEvaluated))
+					# for ii in range(len(self.TimesEvaluated)):
+						# DipoleStrength[ii] = self.Dipoles[ii,0]**2+self.Dipoles[ii,1]**2+self.Dipoles[ii,2]**2
+					# print 'np.shape(DipoleStrength) =',np.shape(DipoleStrength)	
+					# SpectralAnalysis(numpy.array(DipoleStrength), Params.TStep, DesiredMaximum = 26.0/EvPerAu,Smoothing = True)
+					SpectralAnalysis(self.Dipoles, Params.TStep, DesiredMaximum = 4.0/EvPerAu,Smoothing = True)
+				else : 
+					l1 = plt.plot(self.TimesEvaluated,self.Dipoles,'k--')
+					plt.setp(l1,linewidth=2, color='r')
+					plt.xlabel('Time(ps)',fontsize = Params.LabelFontSize)
+					plt.ylabel('|Mu|',fontsize = Params.LabelFontSize)
+					plt.xlim(0,(Params.TMax+1)*Params.time_constant)
+					plt.savefig("./Figures"+Params.SystemName+ Params.start_time+"/"+'Dipole')
+					plt.clf()
+					print "Proc " + str(self.proc_index) + " building spectra"
+					# FFT2016(self.Dipoles,Params.TStep,len(self.TimesEvaluated))
+					SpectralAnalysis(self.Dipoles, Params.TStep, DesiredMaximum = 4.0/EvPerAu,Smoothing = True)
+
 
 		if Params.Parallel == True:
 			aPipe.send(None)
